@@ -1,7 +1,7 @@
 # Cloud Build configuration for Portfolio App
 
 steps:
-  # Step 1: Install dependencies
+  # Step 0: Install dependencies
   - name: 'node:20-alpine'
     entrypoint: 'sh'
     args:
@@ -11,7 +11,7 @@ steps:
         npm install
         echo "Done"
 
-  # Step 2: Build Docker image (no secrets needed here)
+  # Step 1: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     args:
       - 'build'
@@ -36,18 +36,20 @@ steps:
       - 'Dockerfile'
       - '.'
 
-  # Step 3: Push to Artifact Registry
-  - name: 'gcr.io/cloud-builders/docker'
+  # Step 2: Authenticate and push to Artifact Registry
+  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
+    entrypoint: 'bash'
     args:
-      - 'push'
-      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
+      - '-c'
+      - |
+        echo "Authenticating Docker to Artifact Registry..."
+        gcloud auth configure-docker ${_AR_HOSTNAME} --quiet
+        echo "Pushing image..."
+        docker push ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}
+        docker push ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest
+        echo "Push complete!"
 
-  - name: 'gcr.io/cloud-builders/docker'
-    args:
-      - 'push'
-      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
-
-  # Step 4: Deploy to Cloud Run (secrets injected here at runtime)
+  # Step 3: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -76,7 +78,7 @@ steps:
       - '--labels'
       - 'environment=production,managed-by=gcp-cloud-build'
 
-  # Step 5: Health Check
+  # Step 4: Health Check
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
