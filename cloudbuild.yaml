@@ -36,20 +36,19 @@ steps:
       - 'Dockerfile'
       - '.'
 
-  # Step 2: Authenticate and push to Artifact Registry
-  - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
+  # Step 2: Push commit SHA tag
+  - name: 'gcr.io/cloud-builders/docker'
     args:
-      - '-c'
-      - |
-        echo "Authenticating Docker to Artifact Registry..."
-        gcloud auth configure-docker ${_AR_HOSTNAME} --quiet
-        echo "Pushing image..."
-        docker push ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}
-        docker push ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest
-        echo "Push complete!"
+      - 'push'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
 
-  # Step 3: Deploy to Cloud Run
+  # Step 3: Push latest tag
+  - name: 'gcr.io/cloud-builders/docker'
+    args:
+      - 'push'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
+
+  # Step 4: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -75,10 +74,10 @@ steps:
       - 'NODE_ENV=production,NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL},NEXT_PUBLIC_APP_URL=${_APP_URL},SMTP_HOST=${_SMTP_HOST},SMTP_PORT=${_SMTP_PORT},SMTP_USER=${_SMTP_USER},OWNER_EMAIL=${_OWNER_EMAIL},ADMIN_EMAIL=${_ADMIN_EMAIL}'
       - '--update-secrets'
       - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=portfolio-supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=portfolio-supabase-service-role-key:latest,SMTP_PASS=portfolio-smtp-password:latest,ADMIN_PASSWORD=portfolio-admin-password:latest'
-      - '--labels'
-      - 'environment=production,managed-by=gcp-cloud-build'
+      - '--service-account'
+      - '${_AR_PROJECT_ID}@appspot.gserviceaccount.com'
 
-  # Step 4: Health Check
+  # Step 5: Health Check
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'sh'
     args:
@@ -96,6 +95,11 @@ steps:
         fi
         curl -f --max-time 30 "$svc_url" || (echo "Health check failed" && exit 1)
         echo "Deployment successful! Live at: $svc_url"
+
+# Tell Cloud Build to push these images (handles AR auth automatically)
+images:
+  - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
+  - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
 
 substitutions:
   _AR_HOSTNAME: 'us-east4-docker.pkg.dev'
