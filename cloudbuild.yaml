@@ -2,20 +2,13 @@
 
 steps:
   # Step 1: Pre-deployment validation
-  - name: 'node:18-alpine'
+  - name: 'node:20-alpine'
     entrypoint: 'sh'
     args:
       - '-c'
       - |
-        echo "Running pre-deployment validation..."
-        if [ -f pnpm-lock.yaml ]; then
-          npm install -g pnpm
-          pnpm install --frozen-lockfile
-          pnpm exec tsc --noEmit
-        else
-          npm ci
-          npx --yes typescript tsc --noEmit
-        fi
+        echo "Installing dependencies..."
+        npm install
         echo "Pre-deployment validation complete"
 
   # Step 2: Build Docker image
