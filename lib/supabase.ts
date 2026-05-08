@@ -1,31 +1,28 @@
-import { createClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
-// Lazy client - only created when called, not at module load time
-export const getSupabaseClient = () => {
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
-  if (!url || !key) throw new Error('Supabase env vars missing')
+// Public client for frontend use
+export function getSupabaseClient(): SupabaseClient {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   return createClient(url, key)
 }
 
-// Keep backward compat - but lazy
-let _supabase: ReturnType<typeof createClient> | null = null
-export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
-  get(_target, prop) {
-    if (!_supabase) {
-      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
-      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
-      if (url && key) _supabase = createClient(url, key)
-      else return () => ({ data: null, error: { message: 'Supabase not configured' } })
-    }
-    return (_supabase as any)[prop]
-  }
-})
+// Singleton for convenience — created fresh each call to avoid stale closures
+export const supabase = {
+  from: (table: string) => getSupabaseClient().from(table),
+  auth: {
+    getSession: () => getSupabaseClient().auth.getSession(),
+    signOut: () => getSupabaseClient().auth.signOut(),
+  },
+  storage: {
+    from: (bucket: string) => getSupabaseClient().storage.from(bucket),
+  },
+}
 
-export const createAdminClient = () => {
-  const url     = process.env.NEXT_PUBLIC_SUPABASE_URL
-  const service = process.env.SUPABASE_SERVICE_ROLE_KEY
-  if (!url || !service) throw new Error('Supabase admin env vars missing')
+// Admin client using service role key (server-side only)
+export function createAdminClient(): SupabaseClient {
+  const url     = process.env.NEXT_PUBLIC_SUPABASE_URL!
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY!
   return createClient(url, service, {
     auth: { autoRefreshToken: false, persistSession: false },
   })

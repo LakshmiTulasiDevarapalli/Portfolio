@@ -13,28 +13,23 @@ steps:
 
   # Step 1: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
+    entrypoint: 'bash'
     args:
-      - 'build'
-      - '--no-cache'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_APP_URL=${_APP_URL}'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID}'
-      - '--build-arg'
-      - 'NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}'
-      - '--build-arg'
-      - 'SMTP_HOST=${_SMTP_HOST}'
-      - '--build-arg'
-      - 'SMTP_PORT=${_SMTP_PORT}'
-      - '-t'
-      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
-      - '-t'
-      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
-      - '-f'
-      - 'Dockerfile'
-      - '.'
+      - '-c'
+      - |
+        docker build --no-cache \
+          --build-arg NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL} \
+          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$$NEXT_PUBLIC_SUPABASE_ANON_KEY \
+          --build-arg NEXT_PUBLIC_APP_URL=${_APP_URL} \
+          --build-arg NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID} \
+          --build-arg NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA} \
+          --build-arg SMTP_HOST=${_SMTP_HOST} \
+          --build-arg SMTP_PORT=${_SMTP_PORT} \
+          -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA} \
+          -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest \
+          -f Dockerfile .
+    secretEnv:
+      - 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
 
   # Step 2: Push commit SHA tag
   - name: 'gcr.io/cloud-builders/docker'
@@ -99,13 +94,18 @@ images:
   - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
   - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
 
+availableSecrets:
+  secretManager:
+    - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-anon-key/versions/latest
+      env: 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
+
 substitutions:
   _AR_HOSTNAME: 'us-east4-docker.pkg.dev'
   _AR_PROJECT_ID: 'portfolio-495702'
   _AR_REPOSITORY: 'cloud-run-source-deploy'
   _DEPLOY_REGION: 'us-east4'
   _SUPABASE_URL: 'https://grgnlwwlghwzsysmerse.supabase.co'
-  _APP_URL: 'https://portfolio-app-276772531574.us-east4.run.app'
+  _APP_URL: 'https://portfolio-app-xxxxx-uc.a.run.app'
   _SMTP_HOST: 'smtp.gmail.com'
   _SMTP_PORT: '587'
   _SMTP_USER: 'tulasi.devarapalli@gmail.com'
