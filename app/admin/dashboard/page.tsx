@@ -593,12 +593,19 @@ export default function AdminDashboard() {
       const res = await fetch('/api/admin-requests', {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
-        next: { revalidate: 0 },
       } as any)
       const data = await res.json()
-      if (data.requests) setRequests(data.requests)
-      else setRequests([])
-    } catch (e) { console.error('Failed to fetch requests', e) }
+      if (!res.ok) {
+        console.error('admin-requests error:', data)
+        toast.error('Failed to load requests: ' + (data.error || res.status))
+        setRequests([])
+        return
+      }
+      setRequests(data.requests || [])
+    } catch (e) {
+      console.error('Failed to fetch requests', e)
+      setRequests([])
+    }
   }
 
   async function handleRefresh() {
