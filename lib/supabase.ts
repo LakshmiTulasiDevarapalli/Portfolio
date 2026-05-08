@@ -1,14 +1,35 @@
 import { createClient } from '@supabase/supabase-js'
 
-const supabaseUrl     = process.env.NEXT_PUBLIC_SUPABASE_URL!
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+// Lazy client - only created when called, not at module load time
+export const getSupabaseClient = () => {
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY
+  if (!url || !key) throw new Error('Supabase env vars missing')
+  return createClient(url, key)
+}
 
-export const supabase = createClient(supabaseUrl, supabaseAnonKey)
+// Keep backward compat - but lazy
+let _supabase: ReturnType<typeof createClient> | null = null
+export const supabase = new Proxy({} as ReturnType<typeof createClient>, {
+  get(_target, prop) {
+    if (!_supabase) {
+      const url = process.env.NEXT_PUBLIC_SUPABASE_URL || ''
+      const key = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || ''
+      if (url && key) _supabase = createClient(url, key)
+      else return () => ({ data: null, error: { message: 'Supabase not configured' } })
+    }
+    return (_supabase as any)[prop]
+  }
+})
 
-export const createAdminClient = () =>
-  createClient(supabaseUrl, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
+export const createAdminClient = () => {
+  const url     = process.env.NEXT_PUBLIC_SUPABASE_URL
+  const service = process.env.SUPABASE_SERVICE_ROLE_KEY
+  if (!url || !service) throw new Error('Supabase admin env vars missing')
+  return createClient(url, service, {
     auth: { autoRefreshToken: false, persistSession: false },
   })
+}
 
 export type Resource = {
   id: string
@@ -48,6 +69,7 @@ export type ResourceComment = {
   resource_id: string
   comment: string
   author: string
+  location?: string | null
   created_at: string
 }
 
