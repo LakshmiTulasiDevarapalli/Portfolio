@@ -151,10 +151,10 @@ availableSecrets:
 # Substitutions — set these in your Cloud Build trigger settings
 substitutions:
   # Google Cloud infrastructure
-  _AR_HOSTNAME: 'us-central1-docker.pkg.dev'         # Artifact Registry hostname
+  _AR_HOSTNAME: 'us-east4-docker.pkg.dev'         # Artifact Registry hostname
   _AR_PROJECT_ID: 'your-gcp-project-id'              # GCP Project ID
   _AR_REPOSITORY: 'cloud-run-source-deploy'           # Artifact Registry repo name
-  _DEPLOY_REGION: 'us-central1'                       # Cloud Run region
+  _DEPLOY_REGION: 'us-east4'                       # Cloud Run region
 
   # Portfolio app settings
   _SUPABASE_URL: 'https://grgnlwwlghwzsysmerse.supabase.co'
