@@ -571,6 +571,7 @@ export default function AdminDashboard() {
   const [selectedIds, setSelectedIds]     = useState<Set<string>>(new Set())
   const [deletingMultiple, setDeletingMultiple] = useState(false)
   const [confirmModal, setConfirmModal]         = useState<{ open: boolean; title: string; ids: string[]; single: boolean }>({ open: false, title: '', ids: [], single: true })
+  const [requestFilter, setRequestFilter]       = useState<'all' | 'pending' | 'approved' | 'rejected'>('all')
 
   useEffect(() => {
     const token = sessionStorage.getItem('admin_token')
@@ -590,7 +591,7 @@ export default function AdminDashboard() {
   async function fetchRequests() {
     const token = sessionStorage.getItem('admin_token')
     try {
-      const res = await fetch('/api/admin-requests', {
+      const res = await fetch(`/api/admin-requests?t=${Date.now()}`, {
         headers: { Authorization: `Bearer ${token}` },
         cache: 'no-store',
       } as any)
@@ -816,12 +817,36 @@ export default function AdminDashboard() {
       {/* Requests Tab */}
       {tab === 'requests' && (
         <div className="space-y-4">
+          {/* Filter bar */}
+          {requests.length > 0 && (
+            <div className="flex gap-2 flex-wrap mb-2">
+              {(['all', 'pending', 'approved', 'rejected'] as const).map((f) => {
+                const count = f === 'all' ? requests.length : requests.filter(r => r.status === f).length
+                return (
+                  <button key={f} onClick={() => setRequestFilter(f)}
+                    className="text-xs px-3 py-1.5 rounded-lg capitalize transition-all"
+                    style={{
+                      fontFamily: 'DM Mono, monospace',
+                      background: requestFilter === f ? 'rgba(200,149,92,0.15)' : 'rgba(255,255,255,0.04)',
+                      color: requestFilter === f ? '#C8955C' : '#8A8478',
+                      border: requestFilter === f ? '1px solid rgba(200,149,92,0.3)' : '1px solid rgba(200,190,170,0.1)',
+                    }}>
+                    {f === 'all' ? 'All' : f} ({count})
+                  </button>
+                )
+              })}
+            </div>
+          )}
           {requests.length === 0 ? (
             <div className="text-center py-24">
               <Bell size={40} className="mx-auto mb-3" style={{ color: '#2A2A35' }} />
               <p style={{ color: '#8A8478' }}>No access requests yet</p>
             </div>
-          ) : requests.map((req) => (
+          ) : requests.filter(r => requestFilter === 'all' || r.status === requestFilter).length === 0 ? (
+            <div className="text-center py-16">
+              <p style={{ color: '#8A8478' }}>No {requestFilter} requests</p>
+            </div>
+          ) : requests.filter(r => requestFilter === 'all' || r.status === requestFilter).map((req) => (
             <div key={req.id} className="glass rounded-xl p-6 flex flex-col sm:flex-row sm:items-center gap-4">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-2 flex-wrap">
