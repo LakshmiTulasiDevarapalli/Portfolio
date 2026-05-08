@@ -152,7 +152,7 @@ availableSecrets:
 substitutions:
   # Google Cloud infrastructure
   _AR_HOSTNAME: 'us-east4-docker.pkg.dev'         # Artifact Registry hostname
-  _AR_PROJECT_ID: 'your-gcp-project-id'              # GCP Project ID
+  _AR_PROJECT_ID: 'portfolio-495702'              # GCP Project ID
   _AR_REPOSITORY: 'cloud-run-source-deploy'           # Artifact Registry repo name
   _DEPLOY_REGION: 'us-east4'                       # Cloud Run region
 
