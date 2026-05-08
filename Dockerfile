@@ -3,8 +3,7 @@ FROM node:20-alpine AS deps
 RUN apk add --no-cache libc6-compat
 WORKDIR /app
 
-# Install pnpm directly via npm (avoids corepack ESM bug)
-RUN npm install -g pnpm@8.15.0
+RUN npm install -g pnpm@10.15.0
 
 COPY package.json pnpm-lock.yaml ./
 RUN pnpm install --frozen-lockfile
@@ -13,7 +12,7 @@ RUN pnpm install --frozen-lockfile
 FROM node:20-alpine AS builder
 WORKDIR /app
 
-RUN npm install -g pnpm@8.15.0
+RUN npm install -g pnpm@10.15.0
 
 ARG NEXT_PUBLIC_SUPABASE_URL
 ARG NEXT_PUBLIC_SUPABASE_ANON_KEY
