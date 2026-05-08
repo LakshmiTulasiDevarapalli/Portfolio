@@ -105,7 +105,7 @@ substitutions:
   _AR_REPOSITORY: 'cloud-run-source-deploy'
   _DEPLOY_REGION: 'us-east4'
   _SUPABASE_URL: 'https://grgnlwwlghwzsysmerse.supabase.co'
-  _APP_URL: 'https://portfolio-app-xxxxx-uc.a.run.app'
+  _APP_URL: 'https://portfolio-app-276772531574.us-east4.run.app'
   _SMTP_HOST: 'smtp.gmail.com'
   _SMTP_PORT: '587'
   _SMTP_USER: 'tulasi.devarapalli@gmail.com'
