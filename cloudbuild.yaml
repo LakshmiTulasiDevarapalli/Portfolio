@@ -1,7 +1,7 @@
 # Cloud Build configuration for Portfolio App
 
 steps:
-  # Step 1: Pre-deployment validation
+  # Step 1: Install dependencies
   - name: 'node:20-alpine'
     entrypoint: 'sh'
     args:
@@ -9,30 +9,32 @@ steps:
       - |
         echo "Installing dependencies..."
         npm install
-        echo "Pre-deployment validation complete"
+        echo "Done"
 
-  # Step 2: Build Docker image
+  # Step 2: Build Docker image (no secrets needed here)
   - name: 'gcr.io/cloud-builders/docker'
-    entrypoint: 'bash'
     args:
-      - '-c'
-      - >-
-        docker build
-        --no-cache
-        --build-arg NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}
-        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$$NEXT_PUBLIC_SUPABASE_ANON_KEY
-        --build-arg NEXT_PUBLIC_APP_URL=${_APP_URL}
-        --build-arg NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID}
-        --build-arg NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}
-        --build-arg NEXT_PUBLIC_BRANCH=${BRANCH_NAME}
-        --build-arg SMTP_HOST=${_SMTP_HOST}
-        --build-arg SMTP_PORT=${_SMTP_PORT}
-        -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}
-        -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest
-        -f Dockerfile .
-    secretEnv:
-      - 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
-      - 'SUPABASE_SERVICE_ROLE_KEY'
+      - 'build'
+      - '--no-cache'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_APP_URL=${_APP_URL}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID}'
+      - '--build-arg'
+      - 'NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}'
+      - '--build-arg'
+      - 'SMTP_HOST=${_SMTP_HOST}'
+      - '--build-arg'
+      - 'SMTP_PORT=${_SMTP_PORT}'
+      - '-t'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
+      - '-t'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
+      - '-f'
+      - 'Dockerfile'
+      - '.'
 
   # Step 3: Push to Artifact Registry
   - name: 'gcr.io/cloud-builders/docker'
@@ -45,7 +47,7 @@ steps:
       - 'push'
       - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest'
 
-  # Step 4: Deploy to Cloud Run
+  # Step 4: Deploy to Cloud Run (secrets injected here at runtime)
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
     entrypoint: 'gcloud'
     args:
@@ -82,7 +84,9 @@ steps:
       - |
         echo "Waiting for deployment..."
         sleep 20
-        svc_url=$(gcloud run services describe portfolio-app --region=${_DEPLOY_REGION} --format="value(status.url)")
+        svc_url=$(gcloud run services describe portfolio-app \
+          --region=${_DEPLOY_REGION} \
+          --format="value(status.url)")
         echo "Portfolio URL: $svc_url"
         if [ -z "$svc_url" ]; then
           echo "Failed to get service URL"
@@ -90,13 +94,6 @@ steps:
         fi
         curl -f --max-time 30 "$svc_url" || (echo "Health check failed" && exit 1)
         echo "Deployment successful! Live at: $svc_url"
-
-availableSecrets:
-  secretManager:
-    - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-anon-key/versions/latest
-      env: 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
-    - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-service-role-key/versions/latest
-      env: 'SUPABASE_SERVICE_ROLE_KEY'
 
 substitutions:
   _AR_HOSTNAME: 'us-east4-docker.pkg.dev'
