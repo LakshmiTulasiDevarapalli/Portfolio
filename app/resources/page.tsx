@@ -129,6 +129,8 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
     e.preventDefault()
     if (!rName.trim()) return toast.error('Please enter your name')
     if (!pickedStar)   return toast.error('Please select a star rating')
+    if (!rLocation.trim()) return toast.error('Please enter your location')
+    if (!rComment.trim()) return toast.error('Please write a review comment')
     setSubmitting(true)
     try {
       const ratingRes = await fetch('/api/ratings', {
@@ -283,7 +285,7 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
                     onClick={(e) => e.stopPropagation()} />
                 </div>
                 <div className="col-span-2">
-                  <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Location <span className="opacity-50">(optional)</span></label>
+                  <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Location <span style={{ color: '#C8955C' }}>*</span></label>
                   <input className="input" style={{ padding: '8px 12px', fontSize: '0.82rem' }}
                     placeholder="City, Country" value={rLocation}
                     onChange={(e) => setRLocation(e.target.value)}
@@ -293,7 +295,7 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
 
               {/* Review text */}
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Review <span className="opacity-50">(optional)</span></label>
+                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Review <span style={{ color: '#C8955C' }}>*</span></label>
                 <textarea className="input resize-none" style={{ padding: '8px 12px', fontSize: '0.82rem' }}
                   rows={3} placeholder="Share your experience with this resource..."
                   value={rComment} onChange={(e) => setRComment(e.target.value)}
@@ -404,7 +406,10 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    if (!name || !email) return toast.error('Name and email are required')
+    if (!name) return toast.error('Full name is required')
+    if (!email) return toast.error('Email is required')
+    if (!location) return toast.error('Location is required')
+    if (!reason) return toast.error('Please tell us why you need this resource')
     setLoading(true)
     try {
       const res = await fetch('/api/request-access', {
@@ -448,12 +453,12 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
                 <input className="input" type="email" placeholder="you@example.com" value={email} onChange={(e) => setEmail(e.target.value)} required />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Location <span className="opacity-50">(optional)</span></label>
-                <input className="input" placeholder="City, Country" value={location} onChange={(e) => setLocation(e.target.value)} />
+                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Location <span style={{ color: '#C8955C' }}>*</span></label>
+                <input className="input" placeholder="City, Country" value={location} onChange={(e) => setLocation(e.target.value)} required />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Why do you need this? <span className="opacity-50">(optional)</span></label>
-                <textarea className="input resize-none" rows={2} placeholder="Brief reason..." value={reason} onChange={(e) => setReason(e.target.value)} />
+                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Why do you need this? <span style={{ color: '#C8955C' }}>*</span></label>
+                <textarea className="input resize-none" rows={2} placeholder="Brief reason..." value={reason} onChange={(e) => setReason(e.target.value)} required />
               </div>
               <button type="submit" className="btn-primary w-full justify-center" disabled={loading}>
                 {loading ? <Loader2 size={16} className="animate-spin" /> : <Send size={16} />}
@@ -468,9 +473,10 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
 }
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
-function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }: {
+function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, onRefreshRatings }: {
   resource: Resource; onClose: () => void
   onRequestAccess: () => void; onPreviewGenerated: (s: string) => void
+  onRefreshRatings?: () => void
 }) {
   const [generatingPreview, setGeneratingPreview] = useState(false)
   const [synopsis, setSynopsis] = useState(resource.synopsis || '')
@@ -481,7 +487,12 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
     const handler = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose() }
     window.addEventListener('keydown', handler)
     document.body.style.overflow = 'hidden'
-    return () => { window.removeEventListener('keydown', handler); document.body.style.overflow = '' }
+    return () => {
+      window.removeEventListener('keydown', handler)
+      document.body.style.overflow = ''
+      // Refresh resource ratings when panel closes
+      onRefreshRatings?.()
+    }
   }, [onClose])
 
   useEffect(() => {
@@ -790,6 +801,28 @@ export default function ResourcesPage() {
           onClose={() => { setSelected(null); setShowRequest(false) }}
           onRequestAccess={() => setShowRequest(true)}
           onPreviewGenerated={(s) => handlePreviewGenerated(selected.id, s)}
+          onRefreshRatings={async () => {
+            // Re-fetch ratings for this resource and update the card
+            const res = await fetch(`/api/ratings?resource_id=${selected.id}`)
+            const data = await res.json()
+            if (data.ratings) {
+              setResources((prev) => prev.map((r) =>
+                r.id === selected.id
+                  ? { ...r, resource_ratings: data.ratings.map((rt: any) => ({ rating: rt.rating })) }
+                  : r
+              ))
+            }
+            // Also refresh comments count
+            const cRes = await fetch(`/api/comments?resource_id=${selected.id}`)
+            const cData = await cRes.json()
+            if (cData.comments) {
+              setResources((prev) => prev.map((r) =>
+                r.id === selected.id
+                  ? { ...r, resource_comments: cData.comments }
+                  : r
+              ))
+            }
+          }}
         />
       )}
 

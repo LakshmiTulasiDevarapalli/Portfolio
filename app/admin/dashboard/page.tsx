@@ -590,9 +590,14 @@ export default function AdminDashboard() {
   async function fetchRequests() {
     const token = sessionStorage.getItem('admin_token')
     try {
-      const res = await fetch('/api/admin-requests', { headers: { Authorization: `Bearer ${token}` } })
+      const res = await fetch('/api/admin-requests', {
+        headers: { Authorization: `Bearer ${token}` },
+        cache: 'no-store',
+        next: { revalidate: 0 },
+      } as any)
       const data = await res.json()
       if (data.requests) setRequests(data.requests)
+      else setRequests([])
     } catch (e) { console.error('Failed to fetch requests', e) }
   }
 

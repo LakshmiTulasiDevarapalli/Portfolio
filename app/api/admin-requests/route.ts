@@ -40,7 +40,12 @@ export async function GET(req: NextRequest) {
       }, { status: 500 })
     }
 
-    return NextResponse.json({ requests })
+    return NextResponse.json({ requests }, {
+      headers: {
+        'Cache-Control': 'no-store, no-cache, must-revalidate',
+        'Pragma': 'no-cache',
+      }
+    })
   } catch (err: any) {
     console.error('Fatal error in admin-requests:', err)
     return NextResponse.json({ error: err.message }, { status: 500 })
