@@ -9,50 +9,36 @@ steps:
     args:
       - '-c'
       - |
-        echo "🔍 Running pre-deployment validation..."
-        
-        # Install dependencies
+        echo "Running pre-deployment validation..."
         if [ -f pnpm-lock.yaml ]; then
           corepack enable pnpm
           pnpm install --frozen-lockfile
         else
           npm ci
         fi
-        
-        echo "✅ Running type checking..."
+        echo "Running type checking..."
         npx tsc --noEmit
-        
-        echo "✅ Pre-deployment validation complete"
-
-  # Step 1.5: Generate build timestamp
-  - name: 'bash'
-    entrypoint: 'bash'
-    args:
-      - '-c'
-      - |
-        date -u +%Y-%m-%dT%H:%M:%SZ > /workspace/build_time.txt
-        echo "Build timestamp: $(cat /workspace/build_time.txt)"
+        echo "Pre-deployment validation complete"
 
   # Step 2: Build Docker image
   - name: 'gcr.io/cloud-builders/docker'
     entrypoint: 'bash'
     args:
       - '-c'
-      - |
-        docker build \
-          --no-cache \
-          --build-arg NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL} \
-          --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$$NEXT_PUBLIC_SUPABASE_ANON_KEY \
-          --build-arg NEXT_PUBLIC_APP_URL=${_APP_URL} \
-          --build-arg NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID} \
-          --build-arg NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA} \
-          --build-arg NEXT_PUBLIC_BRANCH=${BRANCH_NAME} \
-          --build-arg NEXT_PUBLIC_BUILD_TIME="$(cat /workspace/build_time.txt)" \
-          --build-arg SMTP_HOST=${_SMTP_HOST} \
-          --build-arg SMTP_PORT=${_SMTP_PORT} \
-          -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA} \
-          -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest \
-          -f Dockerfile .
+      - >-
+        docker build
+        --no-cache
+        --build-arg NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL}
+        --build-arg NEXT_PUBLIC_SUPABASE_ANON_KEY=$$NEXT_PUBLIC_SUPABASE_ANON_KEY
+        --build-arg NEXT_PUBLIC_APP_URL=${_APP_URL}
+        --build-arg NEXT_PUBLIC_BUILD_NUMBER=${BUILD_ID}
+        --build-arg NEXT_PUBLIC_COMMIT_SHA=${COMMIT_SHA}
+        --build-arg NEXT_PUBLIC_BRANCH=${BRANCH_NAME}
+        --build-arg SMTP_HOST=${_SMTP_HOST}
+        --build-arg SMTP_PORT=${_SMTP_PORT}
+        -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}
+        -t ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:latest
+        -f Dockerfile .
     secretEnv:
       - 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
       - 'SUPABASE_SERVICE_ROLE_KEY'
@@ -70,37 +56,32 @@ steps:
 
   # Step 4: Deploy to Cloud Run
   - name: 'gcr.io/google.com/cloudsdktool/cloud-sdk'
-    entrypoint: 'bash'
+    entrypoint: 'gcloud'
     args:
-      - '-c'
-      - |
-        gcloud run deploy portfolio-app \
-          --image ${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA} \
-          --region ${_DEPLOY_REGION} \
-          --platform managed \
-          --allow-unauthenticated \
-          --memory 1Gi \
-          --cpu 1 \
-          --min-instances 0 \
-          --max-instances 5 \
-          --set-env-vars "NODE_ENV=production,\
-NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL},\
-NEXT_PUBLIC_APP_URL=${_APP_URL},\
-SMTP_HOST=${_SMTP_HOST},\
-SMTP_PORT=${_SMTP_PORT},\
-SMTP_USER=${_SMTP_USER},\
-OWNER_EMAIL=${_OWNER_EMAIL},\
-ADMIN_EMAIL=${_ADMIN_EMAIL},\
-BUILD_NUMBER=${BUILD_ID},\
-COMMIT_SHA=${COMMIT_SHA},\
-BRANCH=${BRANCH_NAME},\
-BUILD_TIME=$(cat /workspace/build_time.txt)" \
-          --update-secrets "\
-NEXT_PUBLIC_SUPABASE_ANON_KEY=portfolio-supabase-anon-key:latest,\
-SUPABASE_SERVICE_ROLE_KEY=portfolio-supabase-service-role-key:latest,\
-SMTP_PASS=portfolio-smtp-password:latest,\
-ADMIN_PASSWORD=portfolio-admin-password:latest" \
-          --labels "environment=production,managed-by=gcp-cloud-build,commit-sha=${COMMIT_SHA},gcb-build-id=${BUILD_ID}"
+      - 'run'
+      - 'deploy'
+      - 'portfolio-app'
+      - '--image'
+      - '${_AR_HOSTNAME}/${_AR_PROJECT_ID}/${_AR_REPOSITORY}/portfolio-app:${COMMIT_SHA}'
+      - '--region'
+      - '${_DEPLOY_REGION}'
+      - '--platform'
+      - 'managed'
+      - '--allow-unauthenticated'
+      - '--memory'
+      - '1Gi'
+      - '--cpu'
+      - '1'
+      - '--min-instances'
+      - '0'
+      - '--max-instances'
+      - '5'
+      - '--set-env-vars'
+      - 'NODE_ENV=production,NEXT_PUBLIC_SUPABASE_URL=${_SUPABASE_URL},NEXT_PUBLIC_APP_URL=${_APP_URL},SMTP_HOST=${_SMTP_HOST},SMTP_PORT=${_SMTP_PORT},SMTP_USER=${_SMTP_USER},OWNER_EMAIL=${_OWNER_EMAIL},ADMIN_EMAIL=${_ADMIN_EMAIL}'
+      - '--update-secrets'
+      - 'NEXT_PUBLIC_SUPABASE_ANON_KEY=portfolio-supabase-anon-key:latest,SUPABASE_SERVICE_ROLE_KEY=portfolio-supabase-service-role-key:latest,SMTP_PASS=portfolio-smtp-password:latest,ADMIN_PASSWORD=portfolio-admin-password:latest'
+      - '--labels'
+      - 'environment=production,managed-by=gcp-cloud-build'
     secretEnv:
       - 'NEXT_PUBLIC_SUPABASE_ANON_KEY'
       - 'SUPABASE_SERVICE_ROLE_KEY'
@@ -111,32 +92,18 @@ ADMIN_PASSWORD=portfolio-admin-password:latest" \
     args:
       - '-c'
       - |
-        echo "⏳ Waiting for deployment to stabilise..."
+        echo "Waiting for deployment..."
         sleep 20
-        
-        svc_url=$(gcloud run services describe portfolio-app \
-          --region=${_DEPLOY_REGION} \
-          --format="value(status.url)")
-        
-        echo "🌐 Portfolio URL: $svc_url"
-        
+        svc_url=$(gcloud run services describe portfolio-app --region=${_DEPLOY_REGION} --format="value(status.url)")
+        echo "Portfolio URL: $svc_url"
         if [ -z "$svc_url" ]; then
-          echo "❌ Failed to get service URL"
+          echo "Failed to get service URL"
           exit 1
         fi
-        
-        echo "🏥 Testing home page..."
-        curl -f --max-time 30 "$svc_url" || (echo "❌ Health check failed" && exit 1)
-        
-        echo "✅ Portfolio deployment successful!"
-        echo "🔗 Live at: $svc_url"
+        curl -f --max-time 30 "$svc_url" || (echo "Health check failed" && exit 1)
+        echo "Deployment successful! Live at: $svc_url"
 
-# Secrets from Google Secret Manager
-# Create these secrets before first deploy:
-#   gcloud secrets create portfolio-supabase-anon-key --data-file=-
-#   gcloud secrets create portfolio-supabase-service-role-key --data-file=-
-#   gcloud secrets create portfolio-smtp-password --data-file=-
-#   gcloud secrets create portfolio-admin-password --data-file=-
+# Secrets from Secret Manager
 availableSecrets:
   secretManager:
     - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-anon-key/versions/latest
@@ -148,17 +115,14 @@ availableSecrets:
     - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-admin-password/versions/latest
       env: 'ADMIN_PASSWORD'
 
-# Substitutions — set these in your Cloud Build trigger settings
+# Substitutions
 substitutions:
-  # Google Cloud infrastructure
-  _AR_HOSTNAME: 'us-east4-docker.pkg.dev'         # Artifact Registry hostname
-  _AR_PROJECT_ID: 'portfolio-495702'              # GCP Project ID
-  _AR_REPOSITORY: 'cloud-run-source-deploy'           # Artifact Registry repo name
-  _DEPLOY_REGION: 'us-east4'                       # Cloud Run region
-
-  # Portfolio app settings
+  _AR_HOSTNAME: 'us-east4-docker.pkg.dev'
+  _AR_PROJECT_ID: 'portfolio-495702'
+  _AR_REPOSITORY: 'cloud-run-source-deploy'
+  _DEPLOY_REGION: 'us-east4'
   _SUPABASE_URL: 'https://grgnlwwlghwzsysmerse.supabase.co'
-  _APP_URL: 'https://portfolio-app-xxxxx-uc.a.run.app'  # Update after first deploy
+  _APP_URL: 'https://portfolio-app-xxxxx-uc.a.run.app'
   _SMTP_HOST: 'smtp.gmail.com'
   _SMTP_PORT: '587'
   _SMTP_USER: 'tulasi.devarapalli@gmail.com'
@@ -170,4 +134,4 @@ options:
   machineType: 'E2_HIGHCPU_8'
   substitutionOption: ALLOW_LOOSE
 
-timeout: '1200s'  # 20 minutes
+timeout: '1200s'
