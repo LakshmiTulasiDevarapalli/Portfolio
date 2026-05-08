@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase'
-import { verifyToken } from '../admin-login/route'
+import { verifyToken } from '@/lib/auth'
 
 export async function GET(req: NextRequest) {
   const resource_id = req.nextUrl.searchParams.get('resource_id')

@@ -1,26 +1,26 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase'
-import { verifyToken } from '../admin-login/route'
+import { verifyToken } from '@/lib/auth'
 
 async function extractText(buffer: Buffer, fileType: string): Promise<string> {
   try {
     if (fileType === 'pdf') {
-      const pdfParse = (await import('pdf-parse')).default
+      const pdfParse = require('pdf-parse')
       const parsed = await pdfParse(buffer)
       return parsed.text || ''
     }
     if (fileType === 'docx') {
-      const mammoth = await import('mammoth')
+      const mammoth = require('mammoth')
       const result = await mammoth.extractRawText({ buffer })
       return result.value || ''
     }
     if (fileType === 'xlsx') {
-      const str = buffer.toString('utf-8', 0, Math.min(buffer.length, 200000))
+      const str = buffer.toString('latin1', 0, Math.min(buffer.length, 300000))
       const matches = str.match(/<t[^>]*>([^<]+)<\/t>/g) || []
       return matches.map((m: string) => m.replace(/<[^>]+>/g, '').trim()).filter((s: string) => s.length > 1).join(' ')
     }
     if (fileType === 'pptx') {
-      const str = buffer.toString('utf-8', 0, Math.min(buffer.length, 200000))
+      const str = buffer.toString('latin1', 0, Math.min(buffer.length, 300000))
       const matches = str.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || []
       return matches.map((m: string) => m.replace(/<[^>]+>/g, '').trim()).filter((s: string) => s.length > 1).join(' ')
     }
@@ -61,19 +61,16 @@ export async function POST(req: NextRequest) {
   if (!resource_id) return NextResponse.json({ error: 'resource_id required' }, { status: 400 })
 
   const supabase = createAdminClient()
-
   const { data: resource, error } = await supabase
     .from('resources')
     .select('id, title, description, file_type, file_data')
-    .eq('id', resource_id)
-    .single()
+    .eq('id', resource_id).single()
 
   if (error || !resource) return NextResponse.json({ error: 'Resource not found' }, { status: 404 })
 
   let synopsis = ''
-
   if (resource.file_type === 'link') {
-    synopsis = resource.description || `External link resource: ${resource.title}`
+    synopsis = resource.description || ''
   } else if (resource.file_data) {
     const buffer = Buffer.from(resource.file_data, 'base64')
     const rawText = await extractText(buffer, resource.file_type)

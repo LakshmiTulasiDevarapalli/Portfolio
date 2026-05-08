@@ -1,41 +1,53 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient, MIME_TYPES } from '@/lib/supabase'
-import { verifyToken } from '../admin-login/route'
+import { verifyToken } from '@/lib/auth'
 
 export const maxDuration = 60
 
-// ── Extract readable text from file buffer ────────────────────────────────────
+// ── Extract readable text ─────────────────────────────────────────────────────
 async function extractTextFromFile(buffer: Buffer, fileType: string): Promise<string> {
   try {
     if (fileType === 'pdf') {
-      const pdfParse = (await import('pdf-parse')).default
+      // Use require to avoid Next.js static analysis issues with pdf-parse
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const pdfParse = require('pdf-parse')
       const parsed   = await pdfParse(buffer)
       return parsed.text || ''
     }
+
     if (fileType === 'docx') {
-      const mammoth = await import('mammoth')
+      // eslint-disable-next-line @typescript-eslint/no-var-requires
+      const mammoth = require('mammoth')
       const result  = await mammoth.extractRawText({ buffer })
       return result.value || ''
     }
+
     if (fileType === 'xlsx') {
-      // xlsx = ZIP with XML; shared strings are in <t> tags
-      const str     = buffer.toString('utf-8', 0, Math.min(buffer.length, 200000))
+      // xlsx = ZIP containing XML; cell text lives in <t> tags
+      const str     = buffer.toString('latin1', 0, Math.min(buffer.length, 300000))
       const matches = str.match(/<t[^>]*>([^<]+)<\/t>/g) || []
-      return matches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(s => s.length > 1).join(' ')
+      return matches
+        .map((m: string) => m.replace(/<[^>]+>/g, '').trim())
+        .filter((s: string) => s.length > 1)
+        .join(' ')
     }
+
     if (fileType === 'pptx') {
-      // pptx = ZIP with XML; slide text in <a:t> tags
-      const str     = buffer.toString('utf-8', 0, Math.min(buffer.length, 200000))
+      // pptx = ZIP containing XML; slide text lives in <a:t> tags
+      const str     = buffer.toString('latin1', 0, Math.min(buffer.length, 300000))
       const matches = str.match(/<a:t[^>]*>([^<]+)<\/a:t>/g) || []
-      return matches.map(m => m.replace(/<[^>]+>/g, '').trim()).filter(s => s.length > 1).join(' ')
+      return matches
+        .map((m: string) => m.replace(/<[^>]+>/g, '').trim())
+        .filter((s: string) => s.length > 1)
+        .join(' ')
     }
   } catch (err) {
-    console.error('Text extraction error:', err)
+    console.error(`Text extraction failed for ${fileType}:`, err)
   }
   return ''
 }
 
-// ── Clean extracted text into a readable preview ──────────────────────────────
+// ── Clean raw text into a readable preview ────────────────────────────────────
 function buildPreview(rawText: string, maxChars = 600): string {
   if (!rawText) return ''
   const cleaned = rawText
@@ -46,17 +58,23 @@ function buildPreview(rawText: string, maxChars = 600): string {
     .replace(/[^\x20-\x7E\n]/g, ' ')
     .trim()
 
-  const lines = cleaned.split('\n').map(l => l.trim()).filter(l => l.length > 5)
+  const lines = cleaned
+    .split('\n')
+    .map((l: string) => l.trim())
+    .filter((l: string) => l.length > 5)
+
   let preview = ''
   for (const line of lines) {
     if ((preview + ' ' + line).length > maxChars) break
     preview += (preview ? ' ' : '') + line
   }
+
   if (preview.length > maxChars) {
     preview = preview.slice(0, maxChars).trimEnd()
     const lastSpace = preview.lastIndexOf(' ')
     if (lastSpace > maxChars * 0.8) preview = preview.slice(0, lastSpace)
   }
+
   return preview.trim()
 }
 
@@ -78,10 +96,10 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Title and file type are required' }, { status: 400 })
   }
 
-  const tags     = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(Boolean) : []
+  const tags     = tagsRaw ? tagsRaw.split(',').map((t: string) => t.trim()).filter(Boolean) : []
   const supabase = createAdminClient()
 
-  // ── Link ──────────────────────────────────────────────────────────────────
+  // ── Link ─────────────────────────────────────────────────────────────────
   if (fileType === 'link') {
     if (!linkUrl) return NextResponse.json({ error: 'URL required' }, { status: 400 })
     const { data, error } = await supabase
@@ -112,14 +130,14 @@ export async function POST(req: NextRequest) {
   const base64Data  = fileBuffer.toString('base64')
   const mimeType    = MIME_TYPES[fileType] || file.type || 'application/octet-stream'
 
-  // Extract text preview from the actual file content
+  // Extract text preview from actual file content
   let synopsis = ''
   try {
     const rawText = await extractTextFromFile(fileBuffer, fileType)
     synopsis = buildPreview(rawText, 600)
-    console.log(`Extracted ${synopsis.length} chars from ${file.name}`)
+    console.log(`Extracted ${synopsis.length} chars preview from ${file.name}`)
   } catch (e) {
-    console.error('Preview extraction failed:', e)
+    console.error('Preview extraction failed, continuing without synopsis:', e)
   }
 
   const { data, error } = await supabase
@@ -128,7 +146,8 @@ export async function POST(req: NextRequest) {
       title, description: description || null,
       file_type: fileType, file_name: file.name,
       file_size: file.size, file_data: base64Data,
-      mime_type: mimeType, synopsis,
+      mime_type: mimeType,
+      synopsis,
       synopsis_generated: synopsis.length > 0,
       tags, is_active: true,
     })
@@ -139,7 +158,12 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message, code: error.code }, { status: 500 })
   }
 
-  return NextResponse.json({ message: 'File uploaded!', resource: data, previewExtracted: synopsis.length > 0 })
+  return NextResponse.json({
+    message: synopsis.length > 0
+      ? `File uploaded! Preview extracted (${synopsis.length} chars).`
+      : 'File uploaded! No text could be extracted for preview.',
+    resource: data,
+  })
 }
 
 export async function DELETE(req: NextRequest) {
