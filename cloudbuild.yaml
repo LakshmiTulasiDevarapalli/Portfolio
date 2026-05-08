@@ -1,6 +1,4 @@
 # Cloud Build configuration for Portfolio App
-# Triggered on: main branch
-# Deploys to: portfolio-app Cloud Run service
 
 steps:
   # Step 1: Pre-deployment validation
@@ -11,13 +9,13 @@ steps:
       - |
         echo "Running pre-deployment validation..."
         if [ -f pnpm-lock.yaml ]; then
-          corepack enable pnpm
+          npm install -g pnpm
           pnpm install --frozen-lockfile
+          pnpm exec tsc --noEmit
         else
           npm ci
+          npx --yes typescript tsc --noEmit
         fi
-        echo "Running type checking..."
-        npx tsc --noEmit
         echo "Pre-deployment validation complete"
 
   # Step 2: Build Docker image
@@ -100,7 +98,6 @@ steps:
         curl -f --max-time 30 "$svc_url" || (echo "Health check failed" && exit 1)
         echo "Deployment successful! Live at: $svc_url"
 
-# Only declare secrets that are actually used in a step's secretEnv
 availableSecrets:
   secretManager:
     - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-anon-key/versions/latest
@@ -108,7 +105,6 @@ availableSecrets:
     - versionName: projects/${_AR_PROJECT_ID}/secrets/portfolio-supabase-service-role-key/versions/latest
       env: 'SUPABASE_SERVICE_ROLE_KEY'
 
-# Substitutions
 substitutions:
   _AR_HOSTNAME: 'us-east4-docker.pkg.dev'
   _AR_PROJECT_ID: 'portfolio-495702'
