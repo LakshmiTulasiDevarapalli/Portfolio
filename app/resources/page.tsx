@@ -60,7 +60,47 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
   const [rComment, setRComment]     = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => { loadData() }, [resourceId])  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    let cancelled = false
+    async function load() {
+      setLoadingData(true)
+      try {
+        const [ratingsRes, commentsRes] = await Promise.all([
+          fetch(`/api/ratings?resource_id=${resourceId}`),
+          fetch(`/api/comments?resource_id=${resourceId}`),
+        ])
+        if (cancelled) return
+        const ratingsData  = await ratingsRes.json()
+        const commentsData = await commentsRes.json()
+        if (cancelled) return
+
+        setAverage(ratingsData.average || 0)
+        setCount(ratingsData.count || 0)
+        setBreakdown(ratingsData.breakdown || [])
+
+        const ratingsList: any[] = ratingsData.ratings || []
+        const commentsList: any[] = commentsData.comments || []
+        const ratingByName: Record<string, number> = {}
+        ratingsList.forEach((r: any) => {
+          ratingByName[r.reviewer_name?.toLowerCase()] = r.rating
+        })
+        const merged = commentsList.map((c: any) => ({
+          ...c, rating: ratingByName[c.author?.toLowerCase()] ?? null, type: 'review',
+        }))
+        const commentAuthors = new Set(commentsList.map((c: any) => c.author?.toLowerCase()))
+        ratingsList.forEach((r: any) => {
+          if (!commentAuthors.has(r.reviewer_name?.toLowerCase())) {
+            merged.push({ id: r.id, author: r.reviewer_name, location: r.reviewer_location || null, comment: null, rating: r.rating, created_at: r.created_at, type: 'rating-only' })
+          }
+        })
+        setReviews(merged)
+      } finally {
+        if (!cancelled) setLoadingData(false)
+      }
+    }
+    load()
+    return () => { cancelled = true }
+  }, [resourceId])
 
   async function loadData() {
     setLoadingData(true)
@@ -474,10 +514,9 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
 }
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
-function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, onRefreshRatings }: {
+function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }: {
   resource: Resource; onClose: () => void
   onRequestAccess: () => void; onPreviewGenerated: (s: string) => void
-  onRefreshRatings?: () => void
 }) {
   const [generatingPreview, setGeneratingPreview] = useState(false)
   const [synopsis, setSynopsis] = useState(resource.synopsis || '')
@@ -491,7 +530,6 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
     return () => {
       window.removeEventListener('keydown', handler)
       document.body.style.overflow = ''
-      onRefreshRatings?.()
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -574,23 +612,9 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
                   <p className="text-sm" style={{ color: '#8A8478' }}>Extracting text from file...</p>
                 </div>
               ) : synopsis ? (
-                <>
-                  <p className="text-sm leading-relaxed mb-3" style={{ color: '#C8BFB5', lineHeight: 1.85 }}>
-                    {synopsis.length > 400 ? synopsis.slice(0, 400).trimEnd() + '…' : synopsis}
-                  </p>
-                  {synopsis.length > 400 && (
-                    <div className="relative rounded-lg overflow-hidden" style={{ maxHeight: 72 }}>
-                      <p className="text-sm leading-relaxed" style={{ color: '#C8BFB5', lineHeight: 1.85, filter: 'blur(5px)', userSelect: 'none' }}>
-                        {synopsis.slice(400, 900)}
-                      </p>
-                      <div className="absolute inset-0" style={{ background: 'linear-gradient(to bottom, transparent 0%, #0E0E16 75%)' }} />
-                      <div className="absolute bottom-0 left-0 right-0 flex items-center justify-center gap-1.5 pb-1">
-                        <Lock size={10} style={{ color: '#8A8478' }} />
-                        <span className="text-xs" style={{ color: '#8A8478' }}>Full content requires access</span>
-                      </div>
-                    </div>
-                  )}
-                </>
+                <p className="text-sm leading-relaxed" style={{ color: '#C8BFB5', lineHeight: 1.85 }}>
+                  {synopsis}
+                </p>
               ) : (
                 <p className="text-sm italic py-3" style={{ color: '#8A8478' }}>
                   {resource.file_type === 'link' ? resource.description || 'No description available.' : 'Click "Extract Preview" to generate one.'}
@@ -600,19 +624,25 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
           </div>
 
           {/* Request Access */}
-          <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
-            <div className="flex items-start gap-3 mb-4">
-              <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,149,92,0.12)', color: '#C8955C' }}><Lock size={16} /></div>
-              <div>
-                <p className="text-sm font-medium mb-1" style={{ color: '#F5F0E8' }}>Full file is access-protected</p>
-                <p className="text-xs leading-relaxed" style={{ color: '#8A8478' }}>Submit your details to receive a secure download link via email once approved.</p>
+          {resource.file_type === 'link' ? (
+            <a href={resource.file_url!} target="_blank" rel="noopener noreferrer"
+              className="btn-primary w-full justify-center">
+              <Eye size={15} /> Visit Link
+            </a>
+          ) : (
+            <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
+              <div className="flex items-start gap-3 mb-4">
+                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,149,92,0.12)', color: '#C8955C' }}><Lock size={16} /></div>
+                <div>
+                  <p className="text-sm font-medium mb-1" style={{ color: '#F5F0E8' }}>Full file is access-protected</p>
+                  <p className="text-xs leading-relaxed" style={{ color: '#8A8478' }}>Submit your details to receive a secure download link via email once approved.</p>
+                </div>
               </div>
+              <button onClick={onRequestAccess} className="btn-primary w-full justify-center">
+                <Download size={15} /> Request Download Access
+              </button>
             </div>
-            {resource.file_type === 'link'
-              ? <a href={resource.file_url!} target="_blank" rel="noopener noreferrer" className="btn-primary w-full justify-center"><Eye size={15} /> Visit Link</a>
-              : <button onClick={onRequestAccess} className="btn-primary w-full justify-center"><Download size={15} /> Request Download Access</button>
-            }
-          </div>
+          )}
 
           {/* Ratings & Reviews */}
           <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,190,170,0.08)' }}>
@@ -635,12 +665,12 @@ function ResourceCard({ resource, onClick }: { resource: Resource; onClick: () =
     : null
   const commentCount = resource.resource_comments?.length ?? 0
   const synopsis  = resource.synopsis || resource.description || ''
-  const truncated = synopsis.length > 300 ? synopsis.slice(0, 300).trimEnd() + '…' : synopsis
+  const truncated = synopsis  // show full synopsis on card
 
   return (
     <div onClick={onClick}
-      className="glass rounded-2xl cursor-pointer transition-all duration-200 group flex flex-col"
-      style={{ border: '1px solid rgba(200,190,170,0.1)', height: '320px' }}
+      className="glass rounded-2xl cursor-pointer transition-all duration-200 group flex flex-col h-full"
+      style={{ border: '1px solid rgba(200,190,170,0.1)' }}
       onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(200,149,92,0.35)')}
       onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(200,190,170,0.1)')}>
 
@@ -675,7 +705,7 @@ function ResourceCard({ resource, onClick }: { resource: Resource; onClick: () =
         {/* Preview text — fixed height, always 2 lines */}
         <div className="flex-1 overflow-hidden">
           {truncated ? (
-            <p className="text-xs leading-relaxed line-clamp-4 overflow-hidden" style={{ color: '#B0A898', lineHeight: 1.7 }}>{truncated}</p>
+            <p className="text-xs leading-relaxed" style={{ color: '#B0A898', lineHeight: 1.7 }}>{truncated}</p>
           ) : (
             <p className="text-xs italic" style={{ color: '#8A8478' }}>Click to view details & preview</p>
           )}
@@ -787,7 +817,7 @@ export default function ResourcesPage() {
           <p style={{ color: '#8A8478' }}>{resources.length === 0 ? 'No resources available yet.' : 'No resources match your search.'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
           {filtered.map((resource, i) => (
             <div key={resource.id} className="animate-fade-up" style={{ animationDelay: `${0.04 * i}s` }}>
               <ResourceCard resource={resource} onClick={() => setSelected(resource)} />
@@ -802,28 +832,6 @@ export default function ResourcesPage() {
           onClose={() => { setSelected(null); setShowRequest(false) }}
           onRequestAccess={() => setShowRequest(true)}
           onPreviewGenerated={(s) => handlePreviewGenerated(selected.id, s)}
-          onRefreshRatings={async () => {
-            // Re-fetch ratings for this resource and update the card
-            const res = await fetch(`/api/ratings?resource_id=${selected.id}`)
-            const data = await res.json()
-            if (data.ratings) {
-              setResources((prev) => prev.map((r) =>
-                r.id === selected.id
-                  ? { ...r, resource_ratings: data.ratings.map((rt: any) => ({ rating: rt.rating })) }
-                  : r
-              ))
-            }
-            // Also refresh comments count
-            const cRes = await fetch(`/api/comments?resource_id=${selected.id}`)
-            const cData = await cRes.json()
-            if (cData.comments) {
-              setResources((prev) => prev.map((r) =>
-                r.id === selected.id
-                  ? { ...r, resource_comments: cData.comments }
-                  : r
-              ))
-            }
-          }}
         />
       )}
 
