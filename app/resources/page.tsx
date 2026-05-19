@@ -1,5 +1,6 @@
 'use client'
 import { useState, useEffect } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { supabase, Resource } from '@/lib/supabase'
 import {
   FileText, FileSpreadsheet, File, Link2, Search, Filter,
@@ -59,7 +60,7 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
   const [rComment, setRComment]     = useState('')
   const [submitting, setSubmitting] = useState(false)
 
-  useEffect(() => { loadData() }, [resourceId])
+  useEffect(() => { loadData() }, [resourceId])  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function loadData() {
     setLoadingData(true)
@@ -490,10 +491,9 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
     return () => {
       window.removeEventListener('keydown', handler)
       document.body.style.overflow = ''
-      // Refresh resource ratings when panel closes
       onRefreshRatings?.()
     }
-  }, [onClose])
+  }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     if (!synopsis && resource.file_type !== 'link') generatePreview()
@@ -717,7 +717,8 @@ export default function ResourcesPage() {
   const [resources, setResources]     = useState<Resource[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const [filterType, setFilterType]   = useState<string>('all')
+  const searchParams = useSearchParams()
+  const [filterType, setFilterType]   = useState<string>(searchParams.get('filter') || 'all')
   const [selected, setSelected]       = useState<Resource | null>(null)
   const [showRequest, setShowRequest] = useState(false)
 
