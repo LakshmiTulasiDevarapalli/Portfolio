@@ -1,6 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useSearchParams } from 'next/navigation'
+import { useState, useEffect, Suspense } from 'react'
 import { supabase, Resource } from '@/lib/supabase'
 import {
   FileText, FileSpreadsheet, File, Link2, Search, Filter,
@@ -747,8 +746,14 @@ export default function ResourcesPage() {
   const [resources, setResources]     = useState<Resource[]>([])
   const [loading, setLoading]         = useState(true)
   const [search, setSearch]           = useState('')
-  const searchParams = useSearchParams()
-  const [filterType, setFilterType]   = useState<string>(searchParams.get('filter') || 'all')
+  const [filterType, setFilterType]   = useState<string>('all')
+
+  // Read filter from URL on mount
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const filter = params.get('filter')
+    if (filter) setFilterType(filter)
+  }, [])
   const [selected, setSelected]       = useState<Resource | null>(null)
   const [showRequest, setShowRequest] = useState(false)
 
