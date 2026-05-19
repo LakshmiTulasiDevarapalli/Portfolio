@@ -790,12 +790,19 @@ export default function ResourcesPage() {
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-16">
-      <div className="mb-12 animate-fade-up">
+      <div className="mb-10 animate-fade-up">
         <span className="text-xs uppercase tracking-[0.25em] mb-3 block" style={{ color: '#C8955C', fontFamily: 'DM Mono, monospace' }}>Knowledge Base</span>
-        <h1 className="text-4xl md:text-6xl font-light mb-4" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>Resources</h1>
-        <p className="text-base max-w-xl" style={{ color: '#8A8478' }}>
-          Click any resource to read a preview, rate it, and leave a review. Request access to download the full file.
-        </p>
+        <h1 className="text-4xl md:text-6xl font-light mb-6" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>Resources</h1>
+
+        {/* Callout box */}
+        <div className="max-w-2xl rounded-2xl px-6 py-5" style={{
+          border: '1px solid rgba(200,149,92,0.3)',
+          background: 'rgba(200,149,92,0.05)',
+        }}>
+          <p className="text-sm leading-relaxed" style={{ color: '#C8BFB5', lineHeight: 1.85 }}>
+            A curated library of original clinical compliance tools, protocols, and frameworks — developed in the field, refined through real-world survey experience, and adopted across nursing home networks in the United States.
+          </p>
+        </div>
       </div>
 
       <div className="flex flex-col sm:flex-row gap-4 mb-10 animate-fade-up" style={{ animationDelay: '0.1s' }}>
