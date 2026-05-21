@@ -4,24 +4,39 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { Menu, X } from 'lucide-react'
 
-const navLinks = [
+const publicLinks = [
   { href: '/', label: 'Home' },
   { href: '/resources', label: 'Resources' },
   { href: '/experience', label: 'Experience' },
   { href: '/contact', label: 'Contact' },
-  { href: '/admin', label: 'Admin' },
 ]
+
+const adminLink = { href: '/admin', label: 'Admin' }
+
+function getAdminCookie(): boolean {
+  if (typeof document === 'undefined') return false
+  return document.cookie.split(';').some((c) => c.trim().startsWith('admin_session='))
+}
 
 export default function Navigation() {
   const pathname = usePathname()
   const [scrolled, setScrolled] = useState(false)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [isAdmin, setIsAdmin] = useState(false)
 
   useEffect(() => {
     const handler = () => setScrolled(window.scrollY > 20)
     window.addEventListener('scroll', handler)
     return () => window.removeEventListener('scroll', handler)
   }, [])
+
+  // Check admin cookie on mount and whenever pathname changes
+  // (pathname change catches the moment after login redirect)
+  useEffect(() => {
+    setIsAdmin(getAdminCookie())
+  }, [pathname])
+
+  const navLinks = isAdmin ? [...publicLinks, adminLink] : publicLinks
 
   return (
     <header

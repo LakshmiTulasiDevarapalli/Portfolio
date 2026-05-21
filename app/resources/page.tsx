@@ -1,8 +1,8 @@
 'use client'
 import { useState, useEffect, Suspense } from 'react'
-import { supabase, Resource } from '@/lib/supabase'
+import { supabase, Resource, ResourceFile } from '@/lib/supabase'
 import {
-  FileText, FileSpreadsheet, File, Link2, Search, Filter,
+  FileText, FileSpreadsheet, File, Link2, Code2, Search, Filter,
   Download, Eye, Loader2, X, Send, CheckCircle, Star,
   MessageSquare, Lock, Calendar, ChevronRight, Sparkles,
   RefreshCw, ArrowUpDown, ThumbsUp
@@ -15,6 +15,7 @@ const FILE_ICONS = {
   xlsx: { color: '#5CC87B', bg: 'rgba(92,200,123,0.1)',  label: 'Excel',      Icon: FileSpreadsheet },
   pptx: { color: '#C8955C', bg: 'rgba(200,149,92,0.1)',  label: 'PowerPoint', Icon: FileText },
   link: { color: '#9C5CE8', bg: 'rgba(156,92,232,0.1)', label: 'Link',       Icon: Link2 },
+  html: { color: '#34D399', bg: 'rgba(52,211,153,0.1)',   label: 'HTML',       Icon: Code2 },
 } as const
 
 function formatBytes(bytes: number) {
@@ -41,7 +42,7 @@ function StarRow({ value, size = 14, showEmpty = true }: { value: number; size?:
 type SortOption = 'newest' | 'oldest' | 'highest' | 'lowest'
 
 // ── Google-style Ratings & Reviews ───────────────────────────────────────────
-function ReviewSection({ resourceId }: { resourceId: string }) {
+function ReviewSection({ resourceId, onReviewSubmitted }: { resourceId: string; onReviewSubmitted?: (rating: number) => void }) {
   const [average, setAverage]       = useState(0)
   const [count, setCount]           = useState(0)
   const [breakdown, setBreakdown]   = useState<{ star: number; count: number }[]>([])
@@ -200,6 +201,7 @@ function ReviewSection({ resourceId }: { resourceId: string }) {
       setShowForm(false)
       setPickedStar(0); setRName(''); setREmail(''); setRLocation(''); setRComment('')
       await loadData()
+      onReviewSubmitted?.(pickedStar)
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit')
     } finally {
@@ -513,12 +515,15 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
 }
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
-function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }: {
+function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, onReviewSubmitted }: {
   resource: Resource; onClose: () => void
   onRequestAccess: () => void; onPreviewGenerated: (s: string) => void
+  onReviewSubmitted?: (resourceId: string, rating: number) => void
 }) {
   const [generatingPreview, setGeneratingPreview] = useState(false)
-  const [synopsis, setSynopsis] = useState(resource.synopsis || '')
+  // Use local state only for freshly-generated synopsis; always seed from resource prop
+  const [freshSynopsis, setFreshSynopsis] = useState('')
+  const synopsis = freshSynopsis || resource.synopsis || ''
   const fileInfo = FILE_ICONS[resource.file_type] ?? FILE_ICONS.pdf
   const { Icon, color, bg, label } = fileInfo
 
@@ -532,8 +537,10 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
+  // Reset fresh synopsis when resource changes
   useEffect(() => {
-    if (!synopsis && resource.file_type !== 'link') generatePreview()
+    setFreshSynopsis('')
+    if (!resource.synopsis && resource.file_type !== 'link') generatePreview()
   }, [resource.id])
 
   async function generatePreview() {
@@ -544,7 +551,7 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
         body: JSON.stringify({ resource_id: resource.id }),
       })
       const data = await res.json()
-      if (res.ok && data.synopsis) { setSynopsis(data.synopsis); onPreviewGenerated(data.synopsis) }
+      if (res.ok && data.synopsis) { setFreshSynopsis(data.synopsis); onPreviewGenerated(data.synopsis) }
     } catch (err) { console.error('Preview failed:', err) }
     finally { setGeneratingPreview(false) }
   }
@@ -589,6 +596,8 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
             <div className="flex flex-wrap gap-2">{resource.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}</div>
           )}
 
+
+
           {/* File Preview */}
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(200,190,170,0.1)' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(200,190,170,0.08)' }}>
@@ -623,29 +632,68 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
           </div>
 
           {/* Request Access */}
-          {resource.file_type === 'link' ? (
-            <a href={resource.file_url!} target="_blank" rel="noopener noreferrer"
-              className="btn-primary w-full justify-center">
-              <Eye size={15} /> Visit Link
-            </a>
-          ) : (
-            <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
-              <div className="flex items-start gap-3 mb-4">
-                <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,149,92,0.12)', color: '#C8955C' }}><Lock size={16} /></div>
-                <div>
-                  <p className="text-sm font-medium mb-1" style={{ color: '#F5F0E8' }}>Full file is access-protected</p>
-                  <p className="text-xs leading-relaxed" style={{ color: '#8A8478' }}>Submit your details to receive a secure download link via email once approved.</p>
+          {/* Files & Links Section */}
+          <div className="space-y-3">
+            {/* Show all resource_files if available */}
+            {(resource.resource_files && resource.resource_files.length > 0) ? (
+              resource.resource_files.map((rf) => {
+                const info = FILE_ICONS[rf.file_type as keyof typeof FILE_ICONS] || FILE_ICONS.pdf
+                const RIcon = info.Icon
+                if (rf.file_type === 'link' && rf.file_url) {
+                  return (
+                    <a key={rf.id} href={rf.file_url} target="_blank" rel="noopener noreferrer"
+                      className="btn-primary w-full justify-center">
+                      <Eye size={15} /> Visit Link
+                    </a>
+                  )
+                }
+
+                // Protected file — show request access per file
+                return (
+                  <div key={rf.id} className="rounded-2xl p-4" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
+                    <div className="flex items-center gap-3 mb-3">
+                      <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: info.bg, color: info.color }}>
+                        <RIcon size={15} />
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate" style={{ color: '#F5F0E8' }}>{rf.file_name || rf.file_type.toUpperCase()}</p>
+                        <p className="text-xs" style={{ color: '#8A8478' }}>{info.label} {rf.file_size ? `· ${(rf.file_size / 1024).toFixed(0)} KB` : ''}</p>
+                      </div>
+                      <Lock size={14} style={{ color: '#8A8478', flexShrink: 0 }} />
+                    </div>
+                    <button onClick={onRequestAccess} className="btn-primary w-full justify-center">
+                      <Download size={15} /> Request Access
+                    </button>
+                  </div>
+                )
+              })
+            ) : (
+              // Fallback to old single-file behaviour
+              resource.file_type === 'link' ? (
+                <a href={resource.file_url!} target="_blank" rel="noopener noreferrer"
+                  className="btn-primary w-full justify-center">
+                  <Eye size={15} /> Visit Link
+                </a>
+              ) : (
+                <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
+                  <div className="flex items-start gap-3 mb-4">
+                    <div className="w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0" style={{ background: 'rgba(200,149,92,0.12)', color: '#C8955C' }}><Lock size={16} /></div>
+                    <div>
+                      <p className="text-sm font-medium mb-1" style={{ color: '#F5F0E8' }}>Full file is access-protected</p>
+                      <p className="text-xs leading-relaxed" style={{ color: '#8A8478' }}>Submit your details to receive a secure download link via email once approved.</p>
+                    </div>
+                  </div>
+                  <button onClick={onRequestAccess} className="btn-primary w-full justify-center">
+                    <Download size={15} /> Request Download Access
+                  </button>
                 </div>
-              </div>
-              <button onClick={onRequestAccess} className="btn-primary w-full justify-center">
-                <Download size={15} /> Request Download Access
-              </button>
-            </div>
-          )}
+              )
+            )}
+          </div>
 
           {/* Ratings & Reviews */}
           <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,190,170,0.08)' }}>
-            <ReviewSection resourceId={resource.id} />
+            <ReviewSection resourceId={resource.id} onReviewSubmitted={(rating) => onReviewSubmitted?.(resource.id, rating)} />
           </div>
         </div>
       </div>
@@ -654,6 +702,95 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
 }
 
 // ── Resource Card — UNIFORM SIZE ─────────────────────────────────────────────
+function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: () => void }) {
+  const info = FILE_ICONS[resource.file_type] || FILE_ICONS.pdf
+  const Icon = info.Icon
+  const synopsis = resource.synopsis || resource.description || ''
+  const ratings = resource.resource_ratings || []
+  const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1) : null
+  const commentCount = resource.resource_comments?.length || 0
+
+  return (
+    <div
+      onClick={onClick}
+      className="glass rounded-2xl cursor-pointer transition-all duration-200 group"
+      style={{ border: '1px solid rgba(200,190,170,0.1)' }}
+      onMouseEnter={(e) => (e.currentTarget.style.borderColor = 'rgba(200,149,92,0.3)')}
+      onMouseLeave={(e) => (e.currentTarget.style.borderColor = 'rgba(200,190,170,0.1)')}
+    >
+      <div className="flex items-start gap-4 p-5">
+        {/* Icon */}
+        <div className="w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 mt-0.5" style={{ background: info.bg, color: info.color }}>
+          <Icon size={18} />
+        </div>
+
+        {/* Main content */}
+        <div className="flex-1 min-w-0">
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex-1 min-w-0">
+              {/* Title row */}
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <span className="text-xs px-2 py-0.5 rounded" style={{ background: info.bg, color: info.color, fontFamily: 'DM Mono, monospace' }}>
+                  {info.label}
+                </span>
+                {/* Extra badges for each attached resource_file type */}
+                {Array.from(new Set([
+                  // include types from resource_files
+                  ...(resource.resource_files || []).map((rf: any) => rf.file_type),
+                  // also include 'link' if the primary resource has a file_url
+                  ...(resource.file_url && resource.file_type !== 'link' ? ['link'] : []),
+                ]))
+                  .filter((t) => t !== resource.file_type)
+                  .map((t) => {
+                    const fi = FILE_ICONS[t as keyof typeof FILE_ICONS] || FILE_ICONS.pdf
+                    return (
+                      <span key={t} className="text-xs px-2 py-0.5 rounded" style={{ background: fi.bg, color: fi.color, fontFamily: 'DM Mono, monospace' }}>
+                        {fi.label}
+                      </span>
+                    )
+                  })}
+                <h3 className="text-base font-medium" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>
+                  {resource.title}
+                </h3>
+              </div>
+
+              {/* Synopsis */}
+              {synopsis && (
+                <p className="text-sm leading-relaxed mb-2" style={{ color: '#8A8478', lineHeight: 1.7 }}>
+                  {synopsis}
+                </p>
+              )}
+
+              {/* Tags + meta row */}
+              <div className="flex items-center gap-3 flex-wrap">
+                {(resource.tags || []).slice(0, 4).map((tag) => (
+                  <span key={tag} className="tag" style={{ fontSize: '10px' }}>{tag}</span>
+                ))}
+                <span className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>
+                  {new Date(resource.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
+                </span>
+                {avg && (
+                  <span className="flex items-center gap-1 text-xs" style={{ color: '#C8955C' }}>
+                    ★ {avg} ({ratings.length})
+                  </span>
+                )}
+                {commentCount > 0 && (
+                  <span className="text-xs" style={{ color: '#8A8478' }}>{commentCount} review{commentCount > 1 ? 's' : ''}</span>
+                )}
+              </div>
+            </div>
+
+            {/* Arrow */}
+            <div className="flex-shrink-0 mt-1 transition-transform duration-200 group-hover:translate-x-1" style={{ color: '#C8955C' }}>
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none"><path d="M3 8h10M9 4l4 4-4 4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></svg>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function ResourceCard({ resource, onClick }: { resource: Resource; onClick: () => void }) {
   const fileInfo = FILE_ICONS[resource.file_type] ?? FILE_ICONS.pdf
   const { Icon, color, bg, label } = fileInfo
@@ -765,10 +902,11 @@ export default function ResourcesPage() {
       .from('resources')
       .select(`
         id, title, description, synopsis, synopsis_generated,
-        file_type, file_name, file_size, mime_type, file_url,
+        file_type, file_name, file_size, mime_type, file_url, file_data,
         tags, is_active, created_at, updated_at,
         resource_ratings ( rating ),
-        resource_comments ( id )
+        resource_comments ( id ),
+        resource_files ( id, file_type, file_name, file_size, mime_type, file_url, file_data )
       `)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -782,10 +920,30 @@ export default function ResourcesPage() {
     setSelected((prev) => prev?.id === resourceId ? { ...prev, synopsis, synopsis_generated: true } : prev)
   }
 
+  async function handleReviewSubmitted(resourceId: string) {
+    // Re-fetch just the ratings and comments for this resource and update in place
+    const { data } = await supabase
+      .from('resources')
+      .select('id, resource_ratings ( rating ), resource_comments ( id )')
+      .eq('id', resourceId)
+      .single()
+    if (data) {
+      const patch = {
+        resource_ratings: (data as any).resource_ratings ?? [],
+        resource_comments: (data as any).resource_comments ?? [],
+      }
+      setResources((prev) => prev.map((r) => r.id === resourceId ? { ...r, ...patch } as Resource : r))
+      setSelected((prev) => prev?.id === resourceId ? { ...prev, ...patch } as Resource : prev)
+    }
+  }
+
+  // Build tag-based filter tabs dynamically from loaded resources
+  const ALL_TAGS = ['all', ...Array.from(new Set(resources.flatMap((r) => r.tags || []))).sort()]
+
   const filtered = resources.filter((r) => {
     const q = search.toLowerCase()
     const match = !q || r.title.toLowerCase().includes(q) || r.synopsis?.toLowerCase().includes(q) || r.description?.toLowerCase().includes(q) || r.tags?.some((t) => t.toLowerCase().includes(q))
-    return match && (filterType === 'all' || r.file_type === filterType)
+    return match && (filterType === 'all' || (r.tags || []).some((t) => t.toLowerCase() === filterType.toLowerCase()))
   })
 
   return (
@@ -811,11 +969,11 @@ export default function ResourcesPage() {
           <input className="input input-search" placeholder="Search by title, preview, or tag..." value={search} onChange={(e) => setSearch(e.target.value)} />
         </div>
         <div className="flex gap-2 flex-wrap">
-          {ALL_TYPES.map((type) => (
-            <button key={type} onClick={() => setFilterType(type)}
+          {ALL_TAGS.map((tag) => (
+            <button key={tag} onClick={() => setFilterType(tag)}
               className="px-4 py-2 rounded-lg text-xs font-medium transition-all capitalize"
-              style={{ fontFamily: 'DM Mono, monospace', background: filterType === type ? 'rgba(200,149,92,0.15)' : 'rgba(255,255,255,0.04)', color: filterType === type ? '#C8955C' : '#8A8478', border: filterType === type ? '1px solid rgba(200,149,92,0.3)' : '1px solid rgba(200,190,170,0.1)' }}>
-              {type === 'all' ? 'All' : FILE_ICONS[type as keyof typeof FILE_ICONS]?.label || type}
+              style={{ fontFamily: 'DM Mono, monospace', background: filterType === tag ? 'rgba(200,149,92,0.15)' : 'rgba(255,255,255,0.04)', color: filterType === tag ? '#C8955C' : '#8A8478', border: filterType === tag ? '1px solid rgba(200,149,92,0.3)' : '1px solid rgba(200,190,170,0.1)' }}>
+              {tag === 'all' ? 'All' : tag}
             </button>
           ))}
         </div>
@@ -829,10 +987,10 @@ export default function ResourcesPage() {
           <p style={{ color: '#8A8478' }}>{resources.length === 0 ? 'No resources available yet.' : 'No resources match your search.'}</p>
         </div>
       ) : (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-5 items-stretch">
+        <div className="flex flex-col gap-3">
           {filtered.map((resource, i) => (
             <div key={resource.id} className="animate-fade-up" style={{ animationDelay: `${0.04 * i}s` }}>
-              <ResourceCard resource={resource} onClick={() => setSelected(resource)} />
+              <ResourceListItem resource={resource} onClick={() => setSelected(resource)} />
             </div>
           ))}
         </div>
@@ -844,6 +1002,7 @@ export default function ResourcesPage() {
           onClose={() => { setSelected(null); setShowRequest(false) }}
           onRequestAccess={() => setShowRequest(true)}
           onPreviewGenerated={(s) => handlePreviewGenerated(selected.id, s)}
+          onReviewSubmitted={handleReviewSubmitted}
         />
       )}
 

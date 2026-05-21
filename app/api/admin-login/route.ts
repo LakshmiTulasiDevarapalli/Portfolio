@@ -20,7 +20,19 @@ export async function POST(req: NextRequest) {
     }
 
     const token = generateToken(email)
-    return NextResponse.json({ token, message: 'Login successful' })
+
+    const response = NextResponse.json({ token, message: 'Login successful' })
+
+    // Set httpOnly cookie so Navigation can detect admin session
+    response.cookies.set('admin_session', token, {
+      httpOnly: false,   // false so client-side JS in Navigation can read it
+      secure: process.env.NODE_ENV === 'production',  // https only in prod
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7,  // 7 days
+      path: '/',
+    })
+
+    return response
   } catch (err) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }

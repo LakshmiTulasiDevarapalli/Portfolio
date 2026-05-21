@@ -3,7 +3,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import {
   Upload, FileText, Trash2, CheckCircle, XCircle, Loader2,
-  FileSpreadsheet, File, Presentation, Link2, LogOut, Bell,
+  FileSpreadsheet, File, Presentation, Link2, Code2, LogOut, Bell,
   Plus, X, CloudUpload, RefreshCw, ChevronDown, Star,
   Sparkles, MessageSquare, Send, ChevronUp
 } from 'lucide-react'
@@ -16,21 +16,24 @@ const FILE_ICONS: Record<string, any> = {
   xlsx: { icon: FileSpreadsheet, color: '#5CC87B', bg: 'rgba(92,200,123,0.1)',  label: 'Excel' },
   pptx: { icon: Presentation,   color: '#C8955C', bg: 'rgba(200,149,92,0.1)',  label: 'PowerPoint' },
   link: { icon: Link2,           color: '#9C5CE8', bg: 'rgba(156,92,232,0.1)', label: 'Link' },
+  html: { icon: Code2,           color: '#34D399', bg: 'rgba(52,211,153,0.1)', label: 'HTML' },
 }
 
 const FILE_TYPE_OPTIONS = [
   { value: 'pdf',  label: 'PDF Document',            icon: FileText,        color: '#E85C5C' },
   { value: 'docx', label: 'Word Document',            icon: File,            color: '#5C8CE8' },
   { value: 'xlsx', label: 'Excel Spreadsheet',        icon: FileSpreadsheet, color: '#5CC87B' },
-  { value: 'pptx', label: 'PowerPoint Presentation',  icon: Presentation,   color: '#C8955C' },
+  { value: 'pptx', label: 'PowerPoint Presentation',  icon: Presentation,    color: '#C8955C' },
+  { value: 'html', label: 'HTML File',                icon: Code2,           color: '#34D399' },
 ]
 
-function detectFileType(filename: string): 'pdf' | 'docx' | 'xlsx' | 'pptx' {
+function detectFileType(filename: string): 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'html' {
   const ext = filename.split('.').pop()?.toLowerCase() || ''
   if (ext === 'pdf')                    return 'pdf'
   if (['doc', 'docx'].includes(ext))   return 'docx'
   if (['xls', 'xlsx'].includes(ext))   return 'xlsx'
   if (['ppt', 'pptx'].includes(ext))   return 'pptx'
+  if (['html', 'htm'].includes(ext))   return 'html'
   return 'pdf'
 }
 
@@ -47,8 +50,8 @@ function FileTypeDropdown({
   value,
   onChange,
 }: {
-  value: 'pdf' | 'docx' | 'xlsx' | 'pptx'
-  onChange: (v: 'pdf' | 'docx' | 'xlsx' | 'pptx') => void
+  value: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'html'
+  onChange: (v: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'html') => void
 }) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
@@ -379,44 +382,49 @@ function AdminResourceCard({ resource, onDelete, actionLoading, onRefresh, selec
 function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
   const [title, setTitle]             = useState('')
   const [description, setDescription] = useState('')
-  const [fileType, setFileType]       = useState<'pdf' | 'docx' | 'xlsx' | 'pptx'>('pdf')
+  const [synopsis, setSynopsis]       = useState('')
+  const [fileType, setFileType]       = useState<'pdf' | 'docx' | 'xlsx' | 'pptx' | 'html'>('pdf')
   const [tags, setTags]               = useState('')
   const [linkUrl, setLinkUrl]         = useState('')
-  const [file, setFile]               = useState<File | null>(null)
+  const [files, setFiles]             = useState<File[]>([])
   const [dragging, setDragging]       = useState(false)
   const [loading, setLoading]         = useState(false)
   const [progress, setProgress]       = useState('')
-  const [mode, setMode]               = useState<'file' | 'link'>('file')
   const fileRef = useRef<HTMLInputElement>(null)
 
-  function handleFileSelect(selected: File) {
-    setFile(selected)
-    const detected = detectFileType(selected.name)
-    setFileType(detected)
-    if (!title) setTitle(selected.name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '))
+  function handleFileSelect(selected: FileList | File[]) {
+    const arr = Array.from(selected)
+    setFiles((prev) => {
+      const names = new Set(prev.map((f) => f.name))
+      return [...prev, ...arr.filter((f) => !names.has(f.name))]
+    })
+    if (arr[0]) {
+      const detected = detectFileType(arr[0].name)
+      setFileType(detected)
+      if (!title) setTitle(arr[0].name.replace(/\.[^.]+$/, '').replace(/[_-]/g, ' '))
+    }
   }
 
   function onDrop(e: React.DragEvent) {
     e.preventDefault(); setDragging(false)
-    const dropped = e.dataTransfer.files[0]
-    if (dropped) handleFileSelect(dropped)
+    if (e.dataTransfer.files.length) handleFileSelect(e.dataTransfer.files)
   }
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
     if (!title.trim()) return toast.error('Title is required')
-    if (mode === 'file' && !file) return toast.error('Please select a file')
-    if (mode === 'link' && !linkUrl.trim()) return toast.error('Please enter a URL')
+    if (files.length === 0 && !linkUrl.trim()) return toast.error('Please add at least one file or a link')
     setLoading(true); setProgress('Preparing...')
     const token = sessionStorage.getItem('admin_token')
     try {
       const formData = new FormData()
       formData.append('title', title.trim())
       formData.append('description', description.trim())
-      formData.append('file_type', mode === 'link' ? 'link' : fileType)
+      formData.append('file_type', files.length > 0 ? fileType : 'link')
       formData.append('tags', tags)
-      if (file && mode === 'file') formData.append('file', file)
-      if (mode === 'link') formData.append('link_url', linkUrl.trim())
+      if (synopsis.trim()) formData.append('synopsis', synopsis.trim())
+      files.forEach((f, i) => formData.append(i === 0 ? 'file' : `file_${i}`, f))
+      if (linkUrl.trim()) formData.append('link_url', linkUrl.trim())
       formData.append('admin_token', token || '')
       setProgress('Uploading to database...')
       const res = await fetch('/api/upload-resource', { method: 'POST', body: formData })
@@ -435,7 +443,7 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
       style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(10px)', zIndex: 100 }}
       onClick={(e) => { if (e.target === e.currentTarget && !loading) onClose() }}
     >
-      <div className="w-full rounded-2xl relative" style={{ background: '#111118', border: '1px solid rgba(200,149,92,0.2)', maxWidth: '700px' }}>
+      <div className="w-full rounded-2xl relative flex flex-col" style={{ background: '#111118', border: '1px solid rgba(200,149,92,0.2)', maxWidth: '700px', maxHeight: '90vh', overflowY: 'auto' }}>
         {/* Compact header */}
         <div className="flex items-center justify-between px-5 py-3 border-b" style={{ borderColor: 'rgba(200,190,170,0.08)' }}>
           <div className="flex items-center gap-2">
@@ -447,31 +455,16 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
         </div>
 
         <form onSubmit={handleSubmit}>
-          <div className="p-5">
-            {/* Row 1: Mode toggle */}
-            <div className="flex gap-2 mb-4">
-              {(['file', 'link'] as const).map((m) => (
-                <button key={m} type="button"
-                  onClick={() => { setMode(m); setFile(null); setLinkUrl('') }}
-                  className="px-3 py-1.5 rounded-lg text-xs transition-all"
-                  style={{
-                    background: mode === m ? 'rgba(200,149,92,0.15)' : 'rgba(255,255,255,0.04)',
-                    color: mode === m ? '#C8955C' : '#8A8478',
-                    border: mode === m ? '1px solid rgba(200,149,92,0.3)' : '1px solid rgba(200,190,170,0.1)',
-                    fontFamily: 'DM Mono, monospace',
-                  }}>
-                  {m === 'file' ? '📄 File Upload' : '🔗 External Link'}
-                </button>
-              ))}
-            </div>
+          <div className="p-5 space-y-4">
 
-            {/* Row 2: Drop zone (compact horizontal) */}
-            {mode === 'file' && (
+            {/* File upload zone */}
+            <div>
+              <label className="block text-xs mb-2" style={{ color: '#8A8478' }}>Files <span className="opacity-50">(optional if link provided)</span></label>
               <div
-                className="border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200 mb-4"
+                className="border-2 border-dashed rounded-xl cursor-pointer transition-all duration-200"
                 style={{
-                  borderColor: dragging ? '#C8955C' : file ? 'rgba(92,200,123,0.5)' : 'rgba(200,190,170,0.2)',
-                  background: dragging ? 'rgba(200,149,92,0.05)' : file ? 'rgba(92,200,123,0.04)' : 'transparent',
+                  borderColor: dragging ? '#C8955C' : files.length > 0 ? 'rgba(92,200,123,0.5)' : 'rgba(200,190,170,0.2)',
+                  background: dragging ? 'rgba(200,149,92,0.05)' : files.length > 0 ? 'rgba(92,200,123,0.04)' : 'transparent',
                   padding: '10px 16px',
                 }}
                 onClick={() => fileRef.current?.click()}
@@ -479,66 +472,98 @@ function UploadModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: (
                 onDragLeave={() => setDragging(false)}
                 onDrop={onDrop}
               >
-                {file ? (
-                  <div className="flex items-center gap-3">
-                    {(() => { const info = FILE_ICONS[fileType]; const Icon = info.icon; return <Icon size={18} style={{ color: info.color, flexShrink: 0 }} /> })()}
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm font-medium truncate" style={{ color: '#F5F0E8' }}>{file.name}</p>
-                      <p className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>{formatBytes(file.size)} · {FILE_ICONS[fileType]?.label}</p>
-                    </div>
-                    <button type="button" onClick={(e) => { e.stopPropagation(); setFile(null) }} className="p-1 flex-shrink-0" style={{ color: '#8A8478' }}><X size={14} /></button>
+                {files.length > 0 ? (
+                  <div className="space-y-2">
+                    {files.map((f, idx) => {
+                      const ft = detectFileType(f.name)
+                      const info = FILE_ICONS[ft]; const Icon = info.icon
+                      return (
+                        <div key={idx} className="flex items-center gap-3">
+                          <Icon size={16} style={{ color: info.color, flexShrink: 0 }} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate" style={{ color: '#F5F0E8' }}>{f.name}</p>
+                            <p className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>{formatBytes(f.size)} · {info.label}</p>
+                          </div>
+                          <button type="button" onClick={(e) => { e.stopPropagation(); setFiles((prev) => prev.filter((_, i) => i !== idx)) }} className="p-1 flex-shrink-0" style={{ color: '#8A8478' }}><X size={14} /></button>
+                        </div>
+                      )
+                    })}
+                    <p className="text-xs pt-1" style={{ color: '#8A8478' }}>Click to add more files</p>
                   </div>
                 ) : (
                   <div className="flex items-center gap-3">
                     <CloudUpload size={22} style={{ color: '#8A8478', flexShrink: 0 }} />
                     <div>
-                      <p className="text-sm font-medium" style={{ color: '#F5F0E8' }}>Drop file here or click to browse</p>
-                      <p className="text-xs" style={{ color: '#8A8478' }}>PDF, Word, Excel, PowerPoint — max 25 MB</p>
+                      <p className="text-sm font-medium" style={{ color: '#F5F0E8' }}>Drop files here or click to browse</p>
+                      <p className="text-xs" style={{ color: '#8A8478' }}>PDF, Word, Excel, PowerPoint, HTML — multiple files supported</p>
                     </div>
                   </div>
                 )}
-                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx" className="hidden"
-                  onChange={(e) => { const f = e.target.files?.[0]; if (f) handleFileSelect(f) }} />
+                <input ref={fileRef} type="file" accept=".pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.html,.htm" className="hidden" multiple
+                  onChange={(e) => { if (e.target.files?.length) handleFileSelect(e.target.files) }} />
               </div>
-            )}
+            </div>
 
-            {/* Link URL */}
-            {mode === 'link' && (
-              <div className="mb-4">
-                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>URL *</label>
-                <input className="input" style={{ padding: '9px 12px' }} type="url" placeholder="https://example.com/resource" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
-              </div>
-            )}
+            {/* External link */}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>External Link <span className="opacity-50">(optional if files provided)</span></label>
+              <input className="input" style={{ padding: '9px 12px' }} type="url" placeholder="https://example.com/resource" value={linkUrl} onChange={(e) => setLinkUrl(e.target.value)} />
+            </div>
 
-            {/* Row 3: Title + Tags side by side */}
-            <div className="grid grid-cols-2 gap-3 mb-3">
+            {/* Title + Tags */}
+            <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Title <span style={{ color: '#C8955C' }}>*</span></label>
                 <input className="input" style={{ padding: '9px 12px' }} placeholder="Resource title" value={title} onChange={(e) => setTitle(e.target.value)} required />
               </div>
               <div>
-                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Tags <span className="opacity-50">(comma separated)</span></label>
-                <input className="input" style={{ padding: '9px 12px' }} placeholder="finance, 2024" value={tags} onChange={(e) => setTags(e.target.value)} />
+                <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Tag</label>
+                <input className="input" style={{ padding: '9px 12px' }} placeholder="e.g. Regulatory Compliance" value={tags} onChange={(e) => setTags(e.target.value)} />
               </div>
             </div>
 
-            {/* Row 4: Description + File type side by side */}
+            {/* Description + File type */}
             <div className="grid grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>Description</label>
                 <textarea className="input resize-none" style={{ padding: '9px 12px' }} rows={2} placeholder="Brief description..." value={description} onChange={(e) => setDescription(e.target.value)} />
               </div>
-              {mode === 'file' && (
+              {files.length > 0 && (
                 <div>
-                  <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>File Type <span className="opacity-40">(auto-detected)</span></label>
-                  <FileTypeDropdown value={fileType} onChange={setFileType} />
+                  <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>
+                    File Type <span className="opacity-40">
+                      {files.length > 1 ? '(each file uses its own detected type)' : '(auto-detected)'}
+                    </span>
+                  </label>
+                  {files.length === 1
+                    ? <FileTypeDropdown value={fileType} onChange={setFileType} />
+                    : <div className="input flex items-center gap-2 text-sm" style={{ padding: '9px 12px', color: '#8A8478' }}>
+                        <Code2 size={14} />
+                        Auto-detected per file ({[...new Set(files.map(f => detectFileType(f.name)))].join(', ')})
+                      </div>
+                  }
                 </div>
               )}
             </div>
 
+            {/* Synopsis */}
+            <div>
+              <label className="block text-xs mb-1" style={{ color: '#8A8478' }}>
+                Synopsis <span className="opacity-50">(optional — auto-extracted from file if left blank)</span>
+              </label>
+              <textarea
+                className="input resize-none"
+                style={{ padding: '9px 12px' }}
+                rows={3}
+                placeholder="Provide a synopsis, or leave blank to auto-extract from the uploaded file..."
+                value={synopsis}
+                onChange={(e) => setSynopsis(e.target.value)}
+              />
+            </div>
+
             {/* Progress */}
             {loading && progress && (
-              <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm mt-3" style={{ background: 'rgba(200,149,92,0.08)', color: '#C8955C' }}>
+              <div className="flex items-center gap-2 px-4 py-2 rounded-lg text-sm" style={{ background: 'rgba(200,149,92,0.08)', color: '#C8955C' }}>
                 <Loader2 size={14} className="animate-spin" /> {progress}
               </div>
             )}
@@ -755,7 +780,7 @@ export default function AdminDashboard() {
             <CloudUpload size={48} className="mx-auto mb-4" style={{ color: '#2A2A35' }} />
             <p className="text-lg mb-2" style={{ color: '#F5F0E8', fontFamily: 'Cormorant Garamond, serif' }}>No resources yet</p>
             <p className="text-sm mb-6" style={{ color: '#8A8478' }}>Upload your first file to get started</p>
-            <button className="btn-primary mx-auto" onClick={() => setShowUpload(true)}><Plus size={16} /> Upload Resource</button>
+
           </div>
         ) : (
           <>

@@ -34,7 +34,7 @@ export type Resource = {
   description: string | null
   synopsis: string | null
   synopsis_generated: boolean
-  file_type: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'link'
+  file_type: 'pdf' | 'docx' | 'xlsx' | 'pptx' | 'link' | 'html'
   file_name: string | null
   file_size: number
   file_data?: string | null
@@ -46,6 +46,19 @@ export type Resource = {
   updated_at: string
   resource_ratings?: { rating: number }[]
   resource_comments?: { id: string; comment: string; author: string; created_at: string }[]
+  resource_files?: ResourceFile[]
+}
+
+export type ResourceFile = {
+  id: string
+  resource_id?: string
+  file_type: string
+  file_name: string | null
+  file_data: string | null
+  file_size: number
+  mime_type: string | null
+  file_url: string | null
+  created_at?: string
 }
 
 export type AccessRequest = {
@@ -75,4 +88,5 @@ export const MIME_TYPES: Record<string, string> = {
   docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
   xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
   pptx: 'application/vnd.openxmlformats-officedocument.presentationml.presentation',
+  html: 'text/html',
 }

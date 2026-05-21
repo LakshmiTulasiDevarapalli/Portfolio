@@ -39,7 +39,7 @@ export default function AdminPage() {
       <div
         className="absolute inset-0 pointer-events-none"
         style={{
-          background: 'radial-gradient(ellipse 40% 40% at 50% 50%, rgba(92,123,200,0.08) 0%, transparent 70%)',
+          background: 'radial-gradient(ellipse 40% 40% at 50% 50%, rgba(200,149,92,0.08) 0%, transparent 70%)',
         }}
       />
 
@@ -48,9 +48,9 @@ export default function AdminPage() {
         <div className="flex justify-center mb-8">
           <div
             className="w-16 h-16 rounded-2xl flex items-center justify-center"
-            style={{ background: 'rgba(92,123,200,0.12)', border: '1px solid rgba(92,123,200,0.2)' }}
+            style={{ background: 'rgba(200,149,92,0.12)', border: '1px solid rgba(200,149,92,0.2)' }}
           >
-            <Lock size={28} style={{ color: '#5C7BC8' }} />
+            <Lock size={28} style={{ color: '#C8955C' }} />
           </div>
         </div>
 
@@ -68,7 +68,7 @@ export default function AdminPage() {
 
         <div
           className="glass rounded-2xl p-8"
-          style={{ border: '1px solid rgba(92,123,200,0.15)' }}
+          style={{ border: '1px solid rgba(200,149,92,0.15)' }}
         >
           <form onSubmit={handleLogin} className="space-y-5">
             <div>
@@ -115,7 +115,7 @@ export default function AdminPage() {
               type="submit"
               className="w-full justify-center py-3 rounded-lg font-medium text-sm transition-all duration-200"
               style={{
-                background: loading ? 'rgba(92,123,200,0.5)' : 'linear-gradient(135deg, #5C7BC8, #4A69B0)',
+                background: loading ? 'rgba(200,149,92,0.5)' : '#C8955C',
                 color: 'white',
                 border: 'none',
                 cursor: loading ? 'not-allowed' : 'pointer',
