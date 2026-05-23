@@ -86,10 +86,31 @@ export default function HomePage() {
         </h1>
 
         <p
-          className="text-base md:text-lg max-w-2xl mx-auto mb-16 animate-fade-up"
-          style={{ color: '#8A8478', animationDelay: '0.2s', lineHeight: 1.8 }}
+          className="max-w-2xl mx-auto mb-16 animate-fade-up"
+          style={{
+            fontFamily: 'Cormorant Garamond, serif',
+            fontSize: 'clamp(1.1rem, 2vw, 1.3rem)',
+            fontStyle: 'italic',
+            color: '#A09890',
+            animationDelay: '0.2s',
+            lineHeight: 2,
+            letterSpacing: '0.01em',
+          }}
         >
-          I am <span style={{ color: '#C8BFB5' }}>Evette Mathews</span> — a Vice President of Operations, published researcher, and compliance architect whose tools, protocols, and frameworks are used across nursing home networks in Washington, DC, Maryland, and beyond. My work sits at the intersection of clinical care, federal regulatory compliance, and operational leadership across <span style={{ color: '#C8955C' }}>2,000+ certified nursing home beds.</span>
+          I am{' '}
+          <span style={{
+            fontStyle: 'normal',
+            fontWeight: 600,
+            color: '#E8DDD0',
+            letterSpacing: '0.02em',
+          }}>
+            Evette Mathews
+          </span>
+          {' '}— Vice President of Operations, published researcher, and the developer of compliance frameworks, clinical decision tools, and quality systems that nursing home networks across the East Coast region rely on. My work lives at the intersection of{' '}
+          <span style={{ color: '#C8955C', fontStyle: 'normal' }}>
+            federal regulatory compliance, clinical care, and operational leadership
+          </span>
+          {' '}at scale.
         </p>
 
         {/* Cards */}
