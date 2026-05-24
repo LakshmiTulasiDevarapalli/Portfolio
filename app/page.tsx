@@ -89,28 +89,15 @@ export default function HomePage() {
           className="max-w-2xl mx-auto mb-16 animate-fade-up"
           style={{
             fontFamily: 'Cormorant Garamond, serif',
-            fontSize: 'clamp(1.1rem, 2vw, 1.3rem)',
-            fontStyle: 'italic',
-            color: '#A09890',
+            fontSize: 'clamp(0.85rem, 1.5vw, 1rem)',
+            fontWeight: 100,
+            color: '#F5F0E8',
             animationDelay: '0.2s',
-            lineHeight: 2,
+            lineHeight: 1.9,
             letterSpacing: '0.01em',
           }}
         >
-          I am{' '}
-          <span style={{
-            fontStyle: 'normal',
-            fontWeight: 600,
-            color: '#E8DDD0',
-            letterSpacing: '0.02em',
-          }}>
-            Evette Mathews
-          </span>
-          {' '}— Vice President of Operations, published researcher, and the developer of compliance frameworks, clinical decision tools, and quality systems that nursing home networks across the East Coast region rely on. My work lives at the intersection of{' '}
-          <span style={{ color: '#C8955C', fontStyle: 'normal' }}>
-            federal regulatory compliance, clinical care, and operational leadership
-          </span>
-          {' '}at scale.
+          I am <span style={{ color: '#C8955C' }}>Evette Mathews</span> — Vice President of Operations, published researcher, and the developer of compliance frameworks, clinical decision tools, and quality systems that nursing home networks across the East Coast region rely on. My work lives at the intersection of <span style={{ color: '#C8955C' }}>federal regulatory compliance, clinical care, and operational leadership</span> at scale.
         </p>
 
         {/* Cards */}
