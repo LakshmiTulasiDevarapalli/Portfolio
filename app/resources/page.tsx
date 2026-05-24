@@ -9,7 +9,7 @@ import {
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 
-const FILE_ICONS = {
+const FILE_ICONS: Record<string, { color: string; bg: string; label: string; Icon: any }> = {
   pdf:  { color: '#E85C5C', bg: 'rgba(232,92,92,0.1)',   label: 'PDF',        Icon: FileText },
   docx: { color: '#5C8CE8', bg: 'rgba(92,140,232,0.1)',  label: 'Word',       Icon: File },
   xlsx: { color: '#5CC87B', bg: 'rgba(92,200,123,0.1)',  label: 'Excel',      Icon: FileSpreadsheet },
@@ -42,7 +42,7 @@ function StarRow({ value, size = 14, showEmpty = true }: { value: number; size?:
 type SortOption = 'newest' | 'oldest' | 'highest' | 'lowest'
 
 // ── Google-style Ratings & Reviews ───────────────────────────────────────────
-function ReviewSection({ resourceId, onReviewSubmitted }: { resourceId: string; onReviewSubmitted?: (rating: number) => void }) {
+function ReviewSection({ resourceId }: { resourceId: string }) {
   const [average, setAverage]       = useState(0)
   const [count, setCount]           = useState(0)
   const [breakdown, setBreakdown]   = useState<{ star: number; count: number }[]>([])
@@ -201,7 +201,6 @@ function ReviewSection({ resourceId, onReviewSubmitted }: { resourceId: string; 
       setShowForm(false)
       setPickedStar(0); setRName(''); setREmail(''); setRLocation(''); setRComment('')
       await loadData()
-      onReviewSubmitted?.(pickedStar)
     } catch (err: any) {
       toast.error(err.message || 'Failed to submit')
     } finally {
@@ -515,15 +514,12 @@ function RequestModal({ resource, onClose }: { resource: Resource; onClose: () =
 }
 
 // ── Detail Panel ──────────────────────────────────────────────────────────────
-function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, onReviewSubmitted }: {
+function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }: {
   resource: Resource; onClose: () => void
   onRequestAccess: () => void; onPreviewGenerated: (s: string) => void
-  onReviewSubmitted?: (resourceId: string, rating: number) => void
 }) {
   const [generatingPreview, setGeneratingPreview] = useState(false)
-  // Use local state only for freshly-generated synopsis; always seed from resource prop
-  const [freshSynopsis, setFreshSynopsis] = useState('')
-  const synopsis = freshSynopsis || resource.synopsis || ''
+  const [synopsis, setSynopsis] = useState(resource.synopsis || '')
   const fileInfo = FILE_ICONS[resource.file_type] ?? FILE_ICONS.pdf
   const { Icon, color, bg, label } = fileInfo
 
@@ -537,10 +533,8 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
     }
   }, [])  // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Reset fresh synopsis when resource changes
   useEffect(() => {
-    setFreshSynopsis('')
-    if (!resource.synopsis && resource.file_type !== 'link') generatePreview()
+    if (!synopsis && resource.file_type !== 'link') generatePreview()
   }, [resource.id])
 
   async function generatePreview() {
@@ -551,7 +545,7 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
         body: JSON.stringify({ resource_id: resource.id }),
       })
       const data = await res.json()
-      if (res.ok && data.synopsis) { setFreshSynopsis(data.synopsis); onPreviewGenerated(data.synopsis) }
+      if (res.ok && data.synopsis) { setSynopsis(data.synopsis); onPreviewGenerated(data.synopsis) }
     } catch (err) { console.error('Preview failed:', err) }
     finally { setGeneratingPreview(false) }
   }
@@ -596,7 +590,22 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
             <div className="flex flex-wrap gap-2">{resource.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}</div>
           )}
 
-
+          {/* HTML Viewer — rendered inline */}
+          {resource.file_type === 'html' && resource.file_data && (
+            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
+              <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.1)' }}>
+                <Code2 size={14} style={{ color: '#34D399' }} />
+                <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>Interactive HTML Tool</span>
+              </div>
+              <iframe
+                srcDoc={atob(resource.file_data)}
+                className="w-full"
+                style={{ height: '520px', border: 'none', background: '#fff' }}
+                sandbox="allow-scripts allow-same-origin"
+                title={resource.title}
+              />
+            </div>
+          )}
 
           {/* File Preview */}
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(200,190,170,0.1)' }}>
@@ -637,7 +646,7 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
             {/* Show all resource_files if available */}
             {(resource.resource_files && resource.resource_files.length > 0) ? (
               resource.resource_files.map((rf) => {
-                const info = FILE_ICONS[rf.file_type as keyof typeof FILE_ICONS] || FILE_ICONS.pdf
+                const info = FILE_ICONS[rf.file_type] || FILE_ICONS.pdf
                 const RIcon = info.Icon
                 if (rf.file_type === 'link' && rf.file_url) {
                   return (
@@ -647,7 +656,19 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
                     </a>
                   )
                 }
-
+                if (rf.file_type === 'html' && rf.file_data) {
+                  return (
+                    <div key={rf.id} className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
+                      <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.1)' }}>
+                        <Code2 size={14} style={{ color: '#34D399' }} />
+                        <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>{rf.file_name || 'HTML Tool'}</span>
+                      </div>
+                      <iframe srcDoc={atob(rf.file_data)} className="w-full"
+                        style={{ height: '480px', border: 'none', background: '#fff' }}
+                        sandbox="allow-scripts allow-same-origin" title={rf.file_name || resource.title} />
+                    </div>
+                  )
+                }
                 // Protected file — show request access per file
                 return (
                   <div key={rf.id} className="rounded-2xl p-4" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
@@ -674,6 +695,16 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
                   className="btn-primary w-full justify-center">
                   <Eye size={15} /> Visit Link
                 </a>
+              ) : resource.file_type === 'html' && resource.file_data ? (
+                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
+                  <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)' }}>
+                    <Code2 size={14} style={{ color: '#34D399' }} />
+                    <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>HTML Tool</span>
+                  </div>
+                  <iframe srcDoc={atob(resource.file_data)} className="w-full"
+                    style={{ height: '480px', border: 'none', background: '#fff' }}
+                    sandbox="allow-scripts allow-same-origin" title={resource.title} />
+                </div>
               ) : (
                 <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
                   <div className="flex items-start gap-3 mb-4">
@@ -693,7 +724,7 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated, o
 
           {/* Ratings & Reviews */}
           <div className="rounded-2xl p-5" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,190,170,0.08)' }}>
-            <ReviewSection resourceId={resource.id} onReviewSubmitted={(rating) => onReviewSubmitted?.(resource.id, rating)} />
+            <ReviewSection resourceId={resource.id} />
           </div>
         </div>
       </div>
@@ -733,22 +764,6 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
                 <span className="text-xs px-2 py-0.5 rounded" style={{ background: info.bg, color: info.color, fontFamily: 'DM Mono, monospace' }}>
                   {info.label}
                 </span>
-                {/* Extra badges for each attached resource_file type */}
-                {Array.from(new Set([
-                  // include types from resource_files
-                  ...(resource.resource_files || []).map((rf: any) => rf.file_type),
-                  // also include 'link' if the primary resource has a file_url
-                  ...(resource.file_url && resource.file_type !== 'link' ? ['link'] : []),
-                ]))
-                  .filter((t) => t !== resource.file_type)
-                  .map((t) => {
-                    const fi = FILE_ICONS[t as keyof typeof FILE_ICONS] || FILE_ICONS.pdf
-                    return (
-                      <span key={t} className="text-xs px-2 py-0.5 rounded" style={{ background: fi.bg, color: fi.color, fontFamily: 'DM Mono, monospace' }}>
-                        {fi.label}
-                      </span>
-                    )
-                  })}
                 <h3 className="text-base font-medium" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>
                   {resource.title}
                 </h3>
@@ -757,7 +772,7 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
               {/* Synopsis */}
               {synopsis && (
                 <p className="text-sm leading-relaxed mb-2" style={{ color: '#8A8478', lineHeight: 1.7 }}>
-                  {synopsis}
+                  {synopsis.length > 200 ? synopsis.slice(0, 200).trimEnd() + '…' : synopsis}
                 </p>
               )}
 
@@ -896,17 +911,35 @@ export default function ResourcesPage() {
 
   useEffect(() => { fetchResources() }, [])
 
+  async function fetchResourceDetail(resource: Resource) {
+    // Fetch full resource including file_data only when needed
+    setSelected(resource) // show panel immediately with metadata
+    try {
+      const { data } = await supabase
+        .from('resources')
+        .select(`
+          *, 
+          resource_files ( id, file_type, file_name, file_size, mime_type, file_url, file_data )
+        `)
+        .eq('id', resource.id)
+        .single()
+      if (data) setSelected(data as Resource)
+    } catch (e) {
+      console.error('Failed to load resource detail:', e)
+    }
+  }
+
   async function fetchResources() {
     setLoading(true)
     const { data, error } = await supabase
       .from('resources')
       .select(`
         id, title, description, synopsis, synopsis_generated,
-        file_type, file_name, file_size, mime_type, file_url, file_data,
+        file_type, file_name, file_size, mime_type, file_url,
         tags, is_active, created_at, updated_at,
         resource_ratings ( rating ),
         resource_comments ( id ),
-        resource_files ( id, file_type, file_name, file_size, mime_type, file_url, file_data )
+        resource_files ( id, file_type, file_name, file_size, mime_type, file_url )
       `)
       .eq('is_active', true)
       .order('created_at', { ascending: false })
@@ -918,23 +951,6 @@ export default function ResourcesPage() {
   function handlePreviewGenerated(resourceId: string, synopsis: string) {
     setResources((prev) => prev.map((r) => r.id === resourceId ? { ...r, synopsis, synopsis_generated: true } : r))
     setSelected((prev) => prev?.id === resourceId ? { ...prev, synopsis, synopsis_generated: true } : prev)
-  }
-
-  async function handleReviewSubmitted(resourceId: string) {
-    // Re-fetch just the ratings and comments for this resource and update in place
-    const { data } = await supabase
-      .from('resources')
-      .select('id, resource_ratings ( rating ), resource_comments ( id )')
-      .eq('id', resourceId)
-      .single()
-    if (data) {
-      const patch = {
-        resource_ratings: (data as any).resource_ratings ?? [],
-        resource_comments: (data as any).resource_comments ?? [],
-      }
-      setResources((prev) => prev.map((r) => r.id === resourceId ? { ...r, ...patch } as Resource : r))
-      setSelected((prev) => prev?.id === resourceId ? { ...prev, ...patch } as Resource : prev)
-    }
   }
 
   // Build tag-based filter tabs dynamically from loaded resources
@@ -990,7 +1006,7 @@ export default function ResourcesPage() {
         <div className="flex flex-col gap-3">
           {filtered.map((resource, i) => (
             <div key={resource.id} className="animate-fade-up" style={{ animationDelay: `${0.04 * i}s` }}>
-              <ResourceListItem resource={resource} onClick={() => setSelected(resource)} />
+              <ResourceListItem resource={resource} onClick={() => fetchResourceDetail(resource)} />
             </div>
           ))}
         </div>
@@ -1002,7 +1018,6 @@ export default function ResourcesPage() {
           onClose={() => { setSelected(null); setShowRequest(false) }}
           onRequestAccess={() => setShowRequest(true)}
           onPreviewGenerated={(s) => handlePreviewGenerated(selected.id, s)}
-          onReviewSubmitted={handleReviewSubmitted}
         />
       )}
 
