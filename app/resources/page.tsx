@@ -578,10 +578,10 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
             <h2 className="text-3xl font-light leading-snug mb-3" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>{resource.title}</h2>
             <div className="flex items-center gap-4 flex-wrap">
               {resource.file_size > 0 && <span className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>{formatBytes(resource.file_size)}</span>}
-              <span className="text-xs flex items-center gap-1" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>
+              {/* <span className="text-xs flex items-center gap-1" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>
                 <Calendar size={11} />
                 {new Date(resource.created_at).toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-              </span>
+              </span> */}
             </div>
           </div>
 
@@ -781,9 +781,9 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
                 {(resource.tags || []).slice(0, 4).map((tag) => (
                   <span key={tag} className="tag" style={{ fontSize: '10px' }}>{tag}</span>
                 ))}
-                <span className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>
+                {/* <span className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>
                   {new Date(resource.created_at).toLocaleDateString('en-US', { month: 'short', year: 'numeric' })}
-                </span>
+                </span> */}
                 {avg && (
                   <span className="flex items-center gap-1 text-xs" style={{ color: '#C8955C' }}>
                     ★ {avg} ({ratings.length})
