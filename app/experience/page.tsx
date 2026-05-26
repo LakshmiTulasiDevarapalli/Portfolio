@@ -171,15 +171,15 @@ export default function ExperiencePage() {
           <SectionHeader icon={GraduationCap} title="Education" />
           <div className="space-y-3">
             {EDUCATION.map((edu, i) => (
-              <div key={i} className="glass rounded-2xl p-5 flex items-start gap-4"
-                style={{ border: '1px solid rgba(200,190,170,0.1)' }}>
+              <div key={i} className="flex items-start gap-4 rounded-2xl px-5 py-4"
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,190,170,0.08)' }}>
                 <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
                   style={{ background: 'rgba(200,149,92,0.1)', color: '#C8955C' }}>
                   <GraduationCap size={16} />
                 </div>
                 <div className="flex-1 min-w-0">
                   <div className="flex items-start justify-between gap-2">
-                    <p className="text-sm font-medium" style={{ color: '#F5F0E8' }}>{edu.degree}</p>
+                    <p className="text-sm" style={{ color: '#C8BFB5' }}>{edu.degree}</p>
                     <span className="text-xs flex-shrink-0"
                       style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>{edu.year}</span>
                   </div>
@@ -196,10 +196,13 @@ export default function ExperiencePage() {
           <div className="space-y-2.5">
             {CERTIFICATIONS.map((cert, i) => (
               <div key={i} className="flex items-center gap-3 rounded-xl px-4 py-3"
-                style={{ background: 'rgba(200,149,92,0.05)', border: '1px solid rgba(200,149,92,0.13)' }}>
-                <BadgeCheck size={15} style={{ color: '#C8955C', flexShrink: 0 }} />
+                style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(200,190,170,0.08)' }}>
+                <div className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                  style={{ background: 'rgba(200,149,92,0.1)', color: '#C8955C' }}>
+                  <BadgeCheck size={16} />
+                </div>
                 <div className="min-w-0">
-                  <p className="text-sm font-medium leading-snug" style={{ color: '#F5F0E8' }}>{cert.name}</p>
+                  <p className="text-sm leading-snug" style={{ color: '#C8BFB5' }}>{cert.name}</p>
                   {cert.issuer && (
                     <p className="text-xs mt-0.5" style={{ color: '#8A8478' }}>{cert.issuer}</p>
                   )}
