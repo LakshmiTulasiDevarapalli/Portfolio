@@ -639,6 +639,25 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
                     </a>
                   )
                 }
+                if (rf.file_type === 'html') {
+                  return (
+                    <div key={rf.id} className="rounded-2xl p-4" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
+                      <div className="flex items-center gap-3 mb-3">
+                        <div className="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0" style={{ background: info.bg, color: info.color }}>
+                          <RIcon size={15} />
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="text-sm font-medium truncate" style={{ color: '#F5F0E8' }}>{rf.file_name || 'HTML Tool'}</p>
+                          <p className="text-xs" style={{ color: '#8A8478' }}>{info.label}{rf.file_size ? ` · ${(rf.file_size / 1024).toFixed(0)} KB` : ''}</p>
+                        </div>
+                        <Lock size={14} style={{ color: '#8A8478', flexShrink: 0 }} />
+                      </div>
+                      <button onClick={onRequestAccess} className="btn-primary w-full justify-center">
+                        <Download size={15} /> Request Access
+                      </button>
+                    </div>
+                  )
+                }
                 // Protected file — show request access per file
                 return (
                   <div key={rf.id} className="rounded-2xl p-4" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
@@ -700,6 +719,9 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
   const ratings = resource.resource_ratings || []
   const avg = ratings.length ? (ratings.reduce((s, r) => s + r.rating, 0) / ratings.length).toFixed(1) : null
   const commentCount = resource.resource_comments?.length || 0
+  const fileTypeBadges: string[] = resource.resource_files && resource.resource_files.length > 0
+    ? Array.from(new Set(resource.resource_files.map((rf: any) => rf.file_type)))
+    : [resource.file_type]
 
   return (
     <div
@@ -719,11 +741,16 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
         <div className="flex-1 min-w-0">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
-              {/* Title row */}
+              {/* Title row — one badge per file type */}
               <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <span className="text-xs px-2 py-0.5 rounded" style={{ background: info.bg, color: info.color, fontFamily: 'DM Mono, monospace' }}>
-                  {info.label}
-                </span>
+                {fileTypeBadges.map((ft) => {
+                  const ftInfo = FILE_ICONS[ft] || FILE_ICONS.pdf
+                  return (
+                    <span key={ft} className="text-xs px-2 py-0.5 rounded" style={{ background: ftInfo.bg, color: ftInfo.color, fontFamily: 'DM Mono, monospace' }}>
+                      {ftInfo.label}
+                    </span>
+                  )
+                })}
                 <h3 className="text-base font-medium" style={{ fontFamily: 'Cormorant Garamond, serif', color: '#F5F0E8' }}>
                   {resource.title}
                 </h3>
@@ -769,7 +796,9 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
 function ResourceCard({ resource, onClick }: { resource: Resource; onClick: () => void }) {
   const fileInfo = FILE_ICONS[resource.file_type] ?? FILE_ICONS.pdf
   const { Icon, color, bg, label } = fileInfo
-
+  const fileTypeBadges: string[] = resource.resource_files && resource.resource_files.length > 0
+    ? Array.from(new Set(resource.resource_files.map((rf: any) => rf.file_type)))
+    : [resource.file_type]
   const allRatings   = resource.resource_ratings ?? []
   const avgRating    = allRatings.length > 0
     ? Math.round((allRatings.reduce((s: number, r: any) => s + r.rating, 0) / allRatings.length) * 10) / 10
@@ -794,7 +823,14 @@ function ResourceCard({ resource, onClick }: { resource: Resource; onClick: () =
           </div>
           <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2 mb-1 flex-wrap">
-              <span className="text-xs px-2 py-0.5 rounded" style={{ background: bg, color, fontFamily: 'DM Mono, monospace', fontSize: '0.62rem' }}>{label}</span>
+              {fileTypeBadges.map((ft) => {
+                const ftInfo = FILE_ICONS[ft] || FILE_ICONS.pdf
+                return (
+                  <span key={ft} className="text-xs px-2 py-0.5 rounded" style={{ background: ftInfo.bg, color: ftInfo.color, fontFamily: 'DM Mono, monospace', fontSize: '0.62rem' }}>
+                    {ftInfo.label}
+                  </span>
+                )
+              })}
               {resource.file_size > 0 && <span className="text-xs" style={{ color: '#8A8478', fontFamily: 'DM Mono, monospace' }}>{formatBytes(resource.file_size)}</span>}
             </div>
             {/* Title — fixed 2 lines max */}
