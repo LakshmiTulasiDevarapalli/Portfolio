@@ -590,23 +590,6 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
             <div className="flex flex-wrap gap-2">{resource.tags.map((tag) => <span key={tag} className="tag">{tag}</span>)}</div>
           )}
 
-          {/* HTML Viewer — rendered inline */}
-          {resource.file_type === 'html' && resource.file_data && (
-            <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
-              <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.1)' }}>
-                <Code2 size={14} style={{ color: '#34D399' }} />
-                <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>Interactive HTML Tool</span>
-              </div>
-              <iframe
-                srcDoc={atob(resource.file_data)}
-                className="w-full"
-                style={{ height: '520px', border: 'none', background: '#fff' }}
-                sandbox="allow-scripts allow-same-origin"
-                title={resource.title}
-              />
-            </div>
-          )}
-
           {/* File Preview */}
           <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(200,190,170,0.1)' }}>
             <div className="flex items-center justify-between px-4 py-3 border-b" style={{ background: 'rgba(255,255,255,0.02)', borderColor: 'rgba(200,190,170,0.08)' }}>
@@ -656,19 +639,6 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
                     </a>
                   )
                 }
-                if (rf.file_type === 'html' && rf.file_data) {
-                  return (
-                    <div key={rf.id} className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
-                      <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)', borderBottom: '1px solid rgba(52,211,153,0.1)' }}>
-                        <Code2 size={14} style={{ color: '#34D399' }} />
-                        <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>{rf.file_name || 'HTML Tool'}</span>
-                      </div>
-                      <iframe srcDoc={atob(rf.file_data)} className="w-full"
-                        style={{ height: '480px', border: 'none', background: '#fff' }}
-                        sandbox="allow-scripts allow-same-origin" title={rf.file_name || resource.title} />
-                    </div>
-                  )
-                }
                 // Protected file — show request access per file
                 return (
                   <div key={rf.id} className="rounded-2xl p-4" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
@@ -695,16 +665,6 @@ function DetailPanel({ resource, onClose, onRequestAccess, onPreviewGenerated }:
                   className="btn-primary w-full justify-center">
                   <Eye size={15} /> Visit Link
                 </a>
-              ) : resource.file_type === 'html' && resource.file_data ? (
-                <div className="rounded-2xl overflow-hidden" style={{ border: '1px solid rgba(52,211,153,0.15)' }}>
-                  <div className="flex items-center gap-2 px-4 py-3" style={{ background: 'rgba(52,211,153,0.06)' }}>
-                    <Code2 size={14} style={{ color: '#34D399' }} />
-                    <span className="text-xs uppercase tracking-widest" style={{ color: '#34D399', fontFamily: 'DM Mono, monospace' }}>HTML Tool</span>
-                  </div>
-                  <iframe srcDoc={atob(resource.file_data)} className="w-full"
-                    style={{ height: '480px', border: 'none', background: '#fff' }}
-                    sandbox="allow-scripts allow-same-origin" title={resource.title} />
-                </div>
               ) : (
                 <div className="rounded-2xl p-5" style={{ background: 'rgba(200,149,92,0.06)', border: '1px solid rgba(200,149,92,0.15)' }}>
                   <div className="flex items-start gap-3 mb-4">
