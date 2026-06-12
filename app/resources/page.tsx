@@ -759,7 +759,7 @@ function ResourceListItem({ resource, onClick }: { resource: Resource; onClick: 
               {/* Synopsis */}
               {synopsis && (
                 <p className="text-sm leading-relaxed mb-2" style={{ color: '#8A8478', lineHeight: 1.7 }}>
-                  {synopsis.length > 200 ? synopsis.slice(0, 200).trimEnd() + '…' : synopsis}
+                  {synopsis}
                 </p>
               )}
 
