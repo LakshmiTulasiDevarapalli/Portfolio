@@ -7,7 +7,7 @@ export default function HomePage() {
       icon: FlaskConical,
       title: 'Research & Publications',
       description: 'Co-author of peer-reviewed research published in Open Forum Infectious Diseases (Infectious Diseases Society of America), documenting a first-of-its-kind antibiotic stewardship program in a 270-bed nursing home with a 50-bed ventilator-dependent unit — implemented before stewardship became federally mandated.',
-      href: '/resources?filter=Infection Control',
+      href: '/resources?filter=Infection Prevention',
       delay: '0.1s',
     },
     {
